@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 380" width="500" height="380">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="20%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="80%" stop-color="#ca8a04"/>
+      <stop offset="100%" stop-color="#854d0e"/>
+    </linearGradient>
+    <linearGradient id="goldGradH" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ca8a04"/>
+      <stop offset="25%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#fffbeb"/>
+      <stop offset="75%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="rubyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="50%" stop-color="#b91c1c"/>
+      <stop offset="100%" stop-color="#7f1d1d"/>
+    </linearGradient>
+    <linearGradient id="wingGradL" x1="100%" y1="30%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="wingGradR" x1="0%" y1="30%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#78350f" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Left Symmetrical Filigree Wings (Upward flaring flames matching ref 1) -->
+  <g filter="url(#glow)">
+    <path d="M 180,122 C 160,95 130,75 90,65 C 85,85 92,105 110,120 C 80,105 50,110 32,130 C 50,145 78,150 100,155 C 65,160 45,180 50,205 C 75,200 115,190 145,185 C 168,180 180,165 186,145 Z" fill="url(#wingGradL)" stroke="#78350f" stroke-width="2.5"/>
+    <!-- Red vertical flame streaks inside left wing -->
+    <path d="M 82,85 C 80,100 85,115 95,125 M 50,140 C 60,152 75,160 90,165 M 68,190 C 85,188 110,182 130,180" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Delicate connecting scroll bridge -->
+    <path d="M 180,110 Q 155,90 135,95" fill="none" stroke="url(#goldGrad)" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Right Symmetrical Filigree Wings (Upward flaring flames matching ref 1) -->
+  <g filter="url(#glow)">
+    <path d="M 320,122 C 340,95 370,75 410,65 C 415,85 408,105 390,120 C 420,105 450,110 468,130 C 450,145 422,150 400,155 C 435,160 455,180 450,205 C 425,200 385,190 355,185 C 332,180 320,165 314,145 Z" fill="url(#wingGradR)" stroke="#78350f" stroke-width="2.5"/>
+    <!-- Red vertical flame streaks inside right wing -->
+    <path d="M 418,85 C 420,100 415,115 405,125 M 450,140 C 440,152 425,160 410,165 M 432,190 C 415,188 390,182 370,180" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Delicate connecting scroll bridge -->
+    <path d="M 320,110 Q 345,90 365,95" fill="none" stroke="url(#goldGrad)" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Circular Avatar Frame Border with fiery ruby notches -->
+  <circle cx="250" cy="210" r="98" fill="none" stroke="url(#goldGrad)" stroke-width="10" filter="url(#glow)"/>
+  <circle cx="250" cy="210" r="104" fill="none" stroke="#dc2626" stroke-width="3" stroke-dasharray="12, 6"/>
+  <circle cx="250" cy="210" r="92" fill="none" stroke="#78350f" stroke-width="2.5"/>
+
+  <!-- Lower Laurel Filigree Crest (horizontal spreading laurel branches matching ref 1) -->
+  <g filter="url(#glow)">
+    <!-- Left laurel branch -->
+    <path d="M 235,310 C 210,314 175,316 135,305 C 150,318 175,325 205,324 C 220,323 235,320 245,316 Z" fill="url(#goldGrad)" stroke="#78350f" stroke-width="2"/>
+    <!-- Left laurel leaves -->
+    <path d="M 160,310 Q 140,298 135,305 Q 145,318 160,310 Z" fill="url(#goldGrad)" stroke="#78350f" stroke-width="1.5"/>
+    <path d="M 195,316 Q 178,306 170,314 Q 182,324 195,316 Z" fill="url(#goldGrad)" stroke="#78350f" stroke-width="1.5"/>
+    <path d="M 160,318 C 180,325 210,326 230,318" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Right laurel branch -->
+    <path d="M 265,310 C 290,314 325,316 365,305 C 350,318 325,325 295,324 C 280,323 265,320 255,316 Z" fill="url(#goldGrad)" stroke="#78350f" stroke-width="2"/>
+    <!-- Right laurel leaves -->
+    <path d="M 340,310 Q 360,298 365,305 Q 355,318 340,310 Z" fill="url(#goldGrad)" stroke="#78350f" stroke-width="1.5"/>
+    <path d="M 305,316 Q 322,306 330,314 Q 318,324 305,316 Z" fill="url(#goldGrad)" stroke="#78350f" stroke-width="1.5"/>
+    <path d="M 340,318 C 320,325 290,326 270,318" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Center golden crest knot & ruby -->
+    <polygon points="250,307 258,316 250,325 242,316" fill="url(#rubyGrad)" stroke="url(#goldGrad)" stroke-width="1.5"/>
+  </g>
+
+  <!-- Royal 5-Point Crown at Top -->
+  <g filter="url(#glow)">
+    <path d="M 188,118 Q 250,105 312,118 L 322,72 L 290,88 L 250,46 L 210,88 L 178,72 Z" fill="url(#goldGradH)" stroke="#78350f" stroke-width="3"/>
+    <!-- Crown filigree details -->
+    <path d="M 200,112 Q 250,102 300,112" fill="none" stroke="#78350f" stroke-width="1.5"/>
+    
+    <!-- Center Ruby Diamond on Tallest Peak -->
+    <polygon points="250,58 260,72 250,86 240,72" fill="url(#rubyGrad)" stroke="#fef08a" stroke-width="1.5"/>
+    <!-- Ruby facet highlight -->
+    <polygon points="250,62 256,72 250,76 244,72" fill="#f87171" opacity="0.8"/>
+
+    <!-- Side Rubies on Inner Peaks -->
+    <circle cx="210" cy="92" r="5" fill="url(#rubyGrad)" stroke="#fef08a" stroke-width="1.2"/>
+    <circle cx="290" cy="92" r="5" fill="url(#rubyGrad)" stroke="#fef08a" stroke-width="1.2"/>
+    <!-- Outer peak golden spheres -->
+    <circle cx="178" cy="72" r="4" fill="#fde047" stroke="#78350f" stroke-width="1"/>
+    <circle cx="322" cy="72" r="4" fill="#fde047" stroke="#78350f" stroke-width="1"/>
+  </g>
+
+  <!-- Arched TOP 1 Ribbon / Plaque -->
+  <g filter="url(#glow)">
+    <path d="M 194,116 Q 250,104 306,116 L 302,142 Q 250,130 198,142 Z" fill="url(#rubyGrad)" stroke="url(#goldGrad)" stroke-width="3"/>
+    <!-- Inner gold border highlight -->
+    <path d="M 198,120 Q 250,109 302,120" fill="none" stroke="#fef08a" stroke-width="1" opacity="0.9"/>
+    <!-- Bold 'TOP 1' Rank Typography -->
+    <text x="250" y="136" font-family="Impact, 'Arial Black', sans-serif" font-size="21" font-weight="900" fill="#fffbeb" stroke="#7f1d1d" stroke-width="1" text-anchor="middle" letter-spacing="2">TOP 1</text>
+  </g>
+</svg>

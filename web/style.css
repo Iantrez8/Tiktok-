@@ -1,0 +1,1337 @@
+/* TikTok LIVE Virtual Pencil Printer - Hyper Realistic Physical Pass */
+:root {
+  --u: min(1vw, 0.5625vh);
+  --ink: #1f1d1a;
+  --paper: #f8f3e5;
+  --paper-grain: #f2ebd7;
+  --wood-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.35 0.012' numOctaves='3' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.08 0 0 0 0 0.02 0 0 0 0.55 -0.04'/%3E%3C/filter%3E%3Crect width='400' height='600' filter='url(%23f)'/%3E%3C/svg%3E");
+  --paper-fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/%3E%3CfeColorMatrix values='0 0 0 0 0.25 0 0 0 0 0.20 0 0 0 0 0.10 0 0 0 0.25 -0.05'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23f)'/%3E%3C/svg%3E");
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #0c0a08; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select: none; }
+body.transparent { background: transparent; }
+
+#stage {
+  position: relative;
+  width: calc(var(--u) * 100);
+  height: 100vh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #17120d 0%, #080605 85%);
+}
+
+/* ==============================================================
+   TOP HEADER BAR ("PRINT BOOTH | PENCIL PRINTS [LIVE]")
+   ============================================================== */
+#headerBar {
+  position: absolute;
+  top: calc(var(--u) * 1.6);
+  left: calc(var(--u) * 5);
+  right: calc(var(--u) * 5);
+  height: calc(var(--u) * 6.5);
+  background: linear-gradient(180deg, #242526 0%, #141517 70%, #0d0e10 100%);
+  border-radius: calc(var(--u) * 1.2);
+  border: calc(var(--u) * 0.2) solid rgba(255,255,255,0.12);
+  box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 2) rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.25);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headerTrack {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  font-size: calc(var(--u) * 2.5);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: #d1d5db;
+  text-shadow: 0 1px 2px #000;
+}
+
+.boothTitle { color: #f3f4f6; letter-spacing: 0.2em; font-weight: 900; }
+.sep { color: #4b5563; }
+.subTitle { color: #9ca3af; font-weight: 600; letter-spacing: 0.18em; font-size: calc(var(--u) * 2.2); }
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.9);
+  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.4);
+  background: linear-gradient(180deg, #e11d48, #be123c);
+  color: #fff;
+  border-radius: 99px;
+  font-size: calc(var(--u) * 1.8);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  box-shadow: 0 0 calc(var(--u) * 1.5) rgba(225, 29, 72, 0.6);
+}
+
+.recDot {
+  width: calc(var(--u) * 1.2);
+  height: calc(var(--u) * 1.2);
+  border-radius: 50%;
+  background: #fff;
+  animation: pulseRec 1.2s ease-in-out infinite alternate;
+}
+@keyframes pulseRec { from { opacity: 0.35; transform: scale(0.85); } to { opacity: 1; transform: scale(1.15); } }
+
+/* ==============================================================
+   3D DESK SCENE & ISOMETRIC PEN PLOTTER (MATCHING IMAGES 2, 3, 4, 5)
+   ============================================================== */
+#scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+#canvas3d {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 2;
+}
+
+#desk {
+  position: absolute;
+  left: calc(var(--u) * -2);
+  right: calc(var(--u) * -2);
+  width: calc(var(--u) * 104);
+  height: calc(var(--u) * 76);
+  top: calc(var(--u) * 2);
+  transform-origin: 50% 0%;
+  transform: rotateX(24deg);
+  transform-style: preserve-3d;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(255,235,190,0.3) 0%, rgba(255,255,255,0.04) 45%, transparent 75%),
+    repeating-linear-gradient(180deg, #9a5824 0px, #824619 calc(var(--u) * 14.8), #4f2709 calc(var(--u) * 15)),
+    linear-gradient(180deg, #6c411c 0%, #875428 28%, #754823 68%, #5a3416 100%);
+  box-shadow: 0 calc(var(--u) * 1.5) calc(var(--u) * 3) rgba(0,0,0,0.6);
+}
+
+.deskFrontBevel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--u) * -2.4);
+  height: calc(var(--u) * 2.5);
+  background: linear-gradient(180deg, #4f2a0d 0%, #2b1404 100%);
+  border-top: 1px solid rgba(255,210,150,0.25);
+  box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 3) rgba(0,0,0,0.85);
+}
+
+/* Hide legacy elements */
+.extrusionBeam, .lipRoll, #tableEdge, #paperLip {
+  display: none !important;
+}
+
+/* Satin Stainless Steel Linear Rails */
+.rail {
+  position: absolute;
+  top: calc(var(--u) * 3);
+  bottom: calc(var(--u) * 2);
+  width: calc(var(--u) * 1.3);
+  background: linear-gradient(90deg, #333639 0%, #8c9398 22%, #f8fafc 48%, #9aa0a6 72%, #2a2c2e 100%);
+  box-shadow: calc(var(--u) * 0.7) calc(var(--u) * 0.5) calc(var(--u) * 1.4) rgba(0,0,0,0.5);
+  z-index: 5;
+}
+.rail-l { left: calc(var(--u) * 6.5); }
+.rail-r { right: calc(var(--u) * 6.5); }
+
+/* Aluminum Pillow Blocks clamped at the top of the desk */
+.mount-top {
+  position: absolute;
+  left: calc(var(--u) * -1.2);
+  top: 0;
+  width: calc(var(--u) * 3.7);
+  height: calc(var(--u) * 4.8);
+  background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 45%, #475569 100%);
+  border-radius: calc(var(--u) * 0.5);
+  box-shadow:
+    calc(var(--u) * 0.6) calc(var(--u) * 0.8) calc(var(--u) * 1.4) rgba(0,0,0,0.6),
+    inset 0 1px 1px rgba(255,255,255,0.7),
+    inset 0 -1px 2px rgba(0,0,0,0.4);
+}
+
+/* ==============================================================
+   PAPER ON DESK (FLAT TOP SECTION)
+   ============================================================== */
+#paperFlat {
+  position: absolute;
+  left: calc(var(--u) * 14);
+  width: calc(var(--u) * 72);
+  top: calc(var(--u) * 1);
+  height: calc(var(--u) * 72);
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.03) 45%, rgba(60,40,20,0.07) 100%),
+    var(--paper-fibre) 0 0 / calc(var(--u) * 20) calc(var(--u) * 20),
+    #ded5b0;
+  box-shadow:
+    calc(var(--u) * -0.6) 0 calc(var(--u) * 1.4) rgba(0,0,0,0.28),
+    calc(var(--u) * 0.6) 0 calc(var(--u) * 1.4) rgba(0,0,0,0.28);
+  z-index: 3;
+}
+
+.paperTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  will-change: transform;
+}
+
+/* ==============================================================
+   GANTRY & DRAWING CARRIAGE (2-AXIS CNC MECHANISM)
+   ============================================================== */
+#gantry {
+  position: absolute;
+  left: calc(var(--u) * 4.5);
+  width: calc(var(--u) * 91);
+  top: calc(var(--u) * 4);
+  height: calc(var(--u) * 6);
+  z-index: 10;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.crossbar {
+  position: absolute;
+  left: calc(var(--u) * 2);
+  right: calc(var(--u) * 2);
+  top: calc(var(--u) * 2.2);
+  height: calc(var(--u) * 1.2);
+  border-radius: 99px;
+  background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 28%, #64748b 70%, #1e293b 100%);
+  box-shadow: 0 calc(var(--u) * 0.7) calc(var(--u) * 1.4) rgba(0,0,0,0.45);
+}
+
+.slider {
+  position: absolute;
+  top: calc(var(--u) * 0.4);
+  width: calc(var(--u) * 3.8);
+  height: calc(var(--u) * 4.6);
+  background: linear-gradient(135deg, #cbd5e1 0%, #828c98 50%, #3f4752 100%);
+  border-radius: calc(var(--u) * 0.5);
+  box-shadow: calc(var(--u) * 0.6) calc(var(--u) * 0.8) calc(var(--u) * 1.4) rgba(0,0,0,0.55);
+}
+.slider-l { left: calc(var(--u) * 0.8); }
+.slider-r { right: calc(var(--u) * 0.8); }
+
+.carriage {
+  position: absolute;
+  top: calc(var(--u) * 0.1);
+  left: 50%;
+  width: calc(var(--u) * 6.6);
+  height: calc(var(--u) * 5.0);
+  transform: translateX(-50%);
+  transition: left 0.32s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.carriageBody {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #d8dcde 0%, #9ca3af 58%, #272a2e 59%, #121417 100%);
+  border-radius: calc(var(--u) * 0.5);
+  box-shadow: 0 calc(var(--u) * 0.8) calc(var(--u) * 1.6) rgba(0,0,0,0.65);
+  position: relative;
+}
+
+.carriagePlate {
+  position: absolute;
+  inset: calc(var(--u) * 0.5) calc(var(--u) * 0.6) calc(var(--u) * 1.8) calc(var(--u) * 0.6);
+  border-radius: calc(var(--u) * 0.3);
+  background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 40%, #cbd5e1 100%);
+  box-shadow: inset 0 1px 1px #fff, 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.carriageLed {
+  position: absolute;
+  top: calc(var(--u) * 0.7);
+  right: calc(var(--u) * 0.8);
+  width: calc(var(--u) * 0.65);
+  height: calc(var(--u) * 0.65);
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 5px #38bdf8;
+}
+
+#gantry.sketching .carriageLed {
+  background: #ef4444;
+  box-shadow: 0 0 7px #ef4444;
+}
+
+.penHolder {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--u) * -1.8);
+  transform: translateX(-50%);
+  width: calc(var(--u) * 1.3);
+  height: calc(var(--u) * 2.6);
+  background: linear-gradient(90deg, #b45309, #fbbf24 38%, #78350f);
+  border-radius: calc(var(--u) * 0.25);
+  box-shadow: 0 calc(var(--u) * 0.4) calc(var(--u) * 0.6) rgba(0,0,0,0.45);
+}
+
+.stylus {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--u) * -0.55);
+  transform: translateX(-50%);
+  width: calc(var(--u) * 0.85);
+  height: calc(var(--u) * 0.9);
+  background: #fde68a;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.leadTip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--u) * -0.45);
+  transform: translateX(-50%);
+  width: calc(var(--u) * 0.45);
+  height: calc(var(--u) * 0.6);
+  background: #111;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.leadTip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--u) * -0.3);
+  transform: translateX(-50%);
+  width: calc(var(--u) * 1.1);
+  height: calc(var(--u) * 0.35);
+  border-radius: 50%;
+  background: rgba(20, 15, 10, 0.45);
+  filter: blur(calc(var(--u) * 0.08));
+}
+
+/* ==============================================================
+   SEAMLESS PAPER ROLLOVER (NATURAL SPECULAR SHEEN OVER DESK EDGE)
+   ============================================================== */
+#paperRollover {
+  position: absolute;
+  left: calc(var(--u) * 14);
+  width: calc(var(--u) * 72);
+  top: calc(var(--u) * 71.6);
+  height: calc(var(--u) * 2.8);
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.65) 45%,
+    rgba(255,255,255,0) 100%
+  );
+  z-index: 5;
+}
+
+/* ==============================================================
+   HANGING PAPER APRON (SEAMLESSLY DRAPES IN 3D OVER DESK FRONT)
+   ============================================================== */
+#paperHang {
+  position: absolute;
+  left: calc(var(--u) * 14);
+  width: calc(var(--u) * 72);
+  top: calc(var(--u) * 73);
+  height: calc(var(--u) * 72);
+  transform-origin: 50% 0%;
+  transform: rotateX(-28deg);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.06) 0%, transparent 12%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.3) 100%),
+    var(--paper-fibre) 0 0 / calc(var(--u) * 20) calc(var(--u) * 20),
+    #ded5b0;
+  box-shadow:
+    calc(var(--u) * -0.6) 0 calc(var(--u) * 1.5) rgba(0,0,0,0.3),
+    calc(var(--u) * 0.6) 0 calc(var(--u) * 1.5) rgba(0,0,0,0.3),
+    0 calc(var(--u) * 1.5) calc(var(--u) * 3) rgba(0,0,0,0.6);
+  z-index: 4;
+}
+
+/* ==============================================================
+   FLOATING GIFT GUIDE MENU (TIKTOK LIVE MATCHING IMAGE 3)
+   ============================================================== */
+#giftGuide {
+  position: absolute;
+  top: calc(var(--u) * 9.5);
+  right: calc(var(--u) * 2.8);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 0.6);
+  background: rgba(15, 20, 30, 0.72);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 0.8) calc(var(--u) * 1.2);
+  z-index: 25;
+  box-shadow: 0 calc(var(--u) * 0.8) calc(var(--u) * 1.8) rgba(0,0,0,0.5);
+}
+
+.guideItem {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.8);
+  font-size: calc(var(--u) * 1.55);
+  font-weight: 700;
+  color: #f1f5f9;
+}
+.guideIcon { font-size: calc(var(--u) * 1.9); }
+.guideName { flex: 1; color: #e2e8f0; }
+.guideCost {
+  color: #fbbf24;
+  font-size: calc(var(--u) * 1.4);
+  background: rgba(0,0,0,0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ==============================================================
+   PRINT ROWS & CARD STYLES
+   ============================================================== */
+
+/* ==============================================================
+   PRINT ROWS & DYNAMIC CARD SIZES (MATCHING IMAGES 2, 3, 4, 5)
+   ============================================================== */
+.printRow {
+  position: relative;
+  width: 100%;
+}
+
+/* 1. Standard 2-Column Row (🌹 Print x2) */
+.rowStandard2 {
+  height: calc(var(--u) * 23);
+  display: flex;
+  padding: calc(var(--u) * 0.6) calc(var(--u) * 1.5);
+  gap: calc(var(--u) * 1.5);
+}
+
+.slot {
+  flex: 1;
+  height: 100%;
+  position: relative;
+}
+
+/* 2. Standard 1-Column Row (🌹 Print x1 single) */
+.rowStandard1 {
+  height: calc(var(--u) * 23);
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--u) * 0.6) calc(var(--u) * 1.5);
+}
+.rowStandard1 .cardStandard {
+  width: calc(var(--u) * 36);
+  flex: none;
+}
+
+/* Clean square sketch box matching Image 4 (Dzul Realty, tiara abrhy) */
+.cardStandard {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--u) * 0.5);
+  border: 1.5px solid #1c1917;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--u) * 0.6) calc(var(--u) * 0.6);
+  color: #1c1917;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 0.3s;
+}
+
+.cardStandard.framed {
+  background: rgba(255, 250, 240, 0.45);
+}
+
+.cardFrameSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cardFrameRect {
+  fill: none;
+  stroke: #1c1917;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 800;
+  stroke-dashoffset: 800;
+}
+
+.cardContent {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.cardStandard .avatarWrap {
+  position: relative;
+  width: calc(var(--u) * 12.5);
+  height: calc(var(--u) * 12.5);
+  border-radius: 50%;
+  padding: calc(var(--u) * 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  margin-top: calc(var(--u) * 0.2);
+}
+
+.avatarRingSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.avatarRingCircle {
+  fill: none;
+  stroke: #1c1917;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 290;
+  stroke-dashoffset: 290;
+  transform-origin: center;
+  transform: rotate(-90deg);
+}
+
+.avatarImgWrap {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  clip-path: circle(0% at 50% 50%);
+  transition: filter 0.2s;
+}
+
+.cardStandard .avatarImg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.textGroup {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  clip-path: inset(0 100% 0 0);
+  will-change: clip-path;
+}
+
+.cardStandard .userName {
+  margin-top: calc(var(--u) * 0.8);
+  font-size: calc(var(--u) * 2.1);
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 95%;
+  line-height: 1.2;
+}
+
+.cardStandard .userName .hearts {
+  color: #dc2626;
+  margin: 0 calc(var(--u) * 0.4);
+  font-weight: 900;
+}
+
+/* ==============================================================
+   3. BIG GIFT ROW (🍩 Big Gift matching Image 5: Dek_$LM@)
+   ============================================================== */
+.rowBig {
+  height: calc(var(--u) * 29);
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--u) * 0.8) calc(var(--u) * 1.5);
+}
+
+.cardBig {
+  position: relative;
+  width: calc(var(--u) * 44);
+  height: 100%;
+  border-radius: calc(var(--u) * 0.7);
+  border: 2px solid #1c1917;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--u) * 1) calc(var(--u) * 1);
+  color: #1c1917;
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 0.3s;
+}
+
+.cardBig.framed {
+  background: rgba(255, 250, 240, 0.5);
+}
+
+.cardBig .avatarWrap {
+  position: relative;
+  width: calc(var(--u) * 15.5);
+  height: calc(var(--u) * 15.5);
+  border-radius: 50%;
+  padding: calc(var(--u) * 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.cardBig .avatarImg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.cardBig .userName {
+  margin-top: calc(var(--u) * 1);
+  font-size: calc(var(--u) * 2.6);
+  font-weight: 900;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 95%;
+  line-height: 1.2;
+}
+
+.cardBig .userName .hearts {
+  color: #dc2626;
+  margin: 0 calc(var(--u) * 0.4);
+  font-weight: 900;
+}
+
+/* ==============================================================
+   4. VIP / LEGENDARY ROW (💎 Full-Width Banner matching Image 3)
+   ============================================================== */
+.rowVvip {
+  height: calc(var(--u) * 38);
+  padding: calc(var(--u) * 0.8) calc(var(--u) * 1.5);
+}
+
+.cardVvip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--u) * 0.9);
+  border: 2.2px solid #1c1917;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--u) * 1) calc(var(--u) * 1.8);
+  color: #1c1917;
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 0.3s;
+}
+
+.cardVvip.framed {
+  background: linear-gradient(180deg, rgba(254,243,199,0.55) 0%, rgba(253,230,138,0.2) 60%, rgba(254,243,199,0.6) 100%);
+  box-shadow: 0 0 calc(var(--u) * 1.5) rgba(217, 119, 6, 0.2);
+}
+
+.vvipFrameRect {
+  fill: none;
+  stroke: #1c1917;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+}
+
+.vvipContent {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.vvipAvatarRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 1.5);
+  margin-bottom: calc(var(--u) * 0.6);
+}
+
+.wreathLeft, .wreathRight {
+  font-size: calc(var(--u) * 3.8);
+  color: #d97706;
+  filter: drop-shadow(0 2px 3px rgba(180, 83, 9, 0.4));
+  user-select: none;
+}
+
+.vvipAvatarWrap {
+  position: relative;
+  width: calc(var(--u) * 16.5);
+  height: calc(var(--u) * 16.5);
+  border-radius: 50%;
+  padding: calc(var(--u) * 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vvipAvatarWrap .avatarRingCircle {
+  stroke: #d97706;
+  stroke-width: 4.5;
+}
+
+.vvipAvatarWrap .avatarImgWrap {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  clip-path: circle(0% at 50% 50%);
+}
+
+.vvipAvatarWrap .avatarImg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Left "thank you! 💖" and Right "VIP" stamp box (matching Image 3) */
+.vvipBadgeRow {
+  position: absolute;
+  width: 100%;
+  top: calc(var(--u) * 14);
+  left: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 calc(var(--u) * 2);
+  pointer-events: none;
+}
+
+.vvipThankYou {
+  color: #dc2626;
+  font-family: 'Brush Script MT', 'Caveat', cursive, sans-serif;
+  font-size: calc(var(--u) * 2.8);
+  font-weight: 700;
+  transform: rotate(-6deg);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+}
+
+.vvipStamp {
+  color: #b91c1c;
+  border: calc(var(--u) * 0.28) solid #b91c1c;
+  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.5);
+  border-radius: calc(var(--u) * 0.4);
+  font-size: calc(var(--u) * 2.2);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  transform: rotate(8deg);
+  background: rgba(254, 226, 226, 0.6);
+  box-shadow: 0 1px 3px rgba(185, 28, 28, 0.25);
+}
+
+.vvipUser {
+  font-size: calc(var(--u) * 3);
+  font-weight: 900;
+  text-align: center;
+  color: #1c1917;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 95%;
+  margin-top: calc(var(--u) * 0.6);
+}
+
+.vvipUser .crownSm {
+  margin: 0 calc(var(--u) * 0.6);
+  color: #d97706;
+}
+
+/* Buttons in controls */
+#controls button.amberBtn {
+  background: linear-gradient(180deg, #ea580c, #c2410c);
+  color: #fff;
+}
+#controls button.amberBtn:hover {
+  background: linear-gradient(180deg, #f97316, #ea580c);
+}
+
+/* Pencil Sketch Wipe-in Animation */
+.sketchingCard {
+  will-change: clip-path;
+}
+
+/* ==============================================================
+   LIVE FLOATING ACTION PILL (TIKTOK STYLE matching video 00:03-00:11)
+   ============================================================== */
+#livePill {
+  position: absolute;
+  bottom: calc(var(--u) * 2.8);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.8);
+  padding: calc(var(--u) * 0.45) calc(var(--u) * 1.6);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 99px;
+  color: #111827;
+  font-size: calc(var(--u) * 1.55);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 1.6) rgba(0,0,0,0.28);
+  z-index: 40;
+  white-space: nowrap;
+  transition: opacity 0.25s, transform 0.25s;
+}
+
+body.split #livePill {
+  top: calc(var(--u) * 88);
+  bottom: auto;
+}
+
+#livePill.hidden {
+  opacity: 0;
+  transform: translate(-50%, calc(var(--u) * 2));
+  pointer-events: none;
+}
+
+.pillIcon { font-size: calc(var(--u) * 2.4); }
+
+/* ==============================================================
+   GOLDEN VIP SHOUTOUT BANNER ("FOLLOW @username" for Big/VIP Gifters)
+   ============================================================== */
+#vipBanner {
+  position: absolute;
+  top: calc(var(--u) * 2.2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2.2);
+  padding: calc(var(--u) * 1.3) calc(var(--u) * 3.0) calc(var(--u) * 1.3) calc(var(--u) * 1.8);
+  background: linear-gradient(135deg, #1c1408 0%, #2e1d08 55%, #1a1105 100%);
+  border: 2px solid #facc15;
+  border-radius: 999px;
+  box-shadow: 0 calc(var(--u) * 0.8) calc(var(--u) * 2.4) rgba(0, 0, 0, 0.65);
+  z-index: 45;
+  white-space: nowrap;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#vipBanner.hidden {
+  opacity: 0;
+  transform: translate(-50%, calc(var(--u) * -2));
+  pointer-events: none;
+}
+
+#vipBannerAvatar {
+  width: calc(var(--u) * 9.2);
+  height: calc(var(--u) * 9.2);
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2.5px solid #fde047;
+  background: #27272a;
+  flex-shrink: 0;
+}
+
+.vipBannerBody {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 0.2);
+}
+
+.vipBannerBadge {
+  font-size: calc(var(--u) * 1.75);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fde047;
+  text-transform: uppercase;
+}
+
+.vipBannerFollow {
+  font-size: calc(var(--u) * 2.75);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+.vipBannerGift {
+  font-size: calc(var(--u) * 1.7);
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+/* ==============================================================
+   STREAMER CONTROLS PANEL (Hide with ?controls=0, collapsible)
+   ============================================================== */
+#controls {
+  position: absolute;
+  left: calc(var(--u) * 2);
+  bottom: calc(var(--u) * 2);
+  width: calc(var(--u) * 58);
+  padding: calc(var(--u) * 1.6);
+  border-radius: calc(var(--u) * 1.2);
+  background: rgba(18, 18, 20, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e5e7eb;
+  font-size: max(11px, calc(var(--u) * 2.1));
+  z-index: 50;
+  transition: all 0.25s ease-out;
+}
+
+.toggleControlsBtn {
+  display: block;
+  width: 100%;
+  padding: calc(var(--u) * 0.7) calc(var(--u) * 1.4);
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: calc(var(--u) * 0.8);
+  color: #f1f5f9;
+  font-weight: 700;
+  font-size: calc(var(--u) * 1.7);
+  cursor: pointer;
+  margin-bottom: calc(var(--u) * 1);
+  transition: background 0.15s;
+}
+.toggleControlsBtn:hover {
+  background: rgba(51, 65, 85, 0.95);
+}
+
+#controls.collapsed {
+  width: auto;
+  padding: calc(var(--u) * 0.5) calc(var(--u) * 1.0);
+  background: rgba(18, 18, 20, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 99px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+#controls.collapsed .ctrlContent {
+  display: none !important;
+}
+#controls.collapsed .toggleControlsBtn {
+  margin-bottom: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-size: calc(var(--u) * 1.6);
+}
+#controls:not(.collapsed) .toggleControlsBtn {
+  background: #334155;
+  margin-bottom: calc(var(--u) * 1);
+}
+
+body.nocontrols #controls { display: none !important; }
+
+.ctrlRow {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1);
+  margin-bottom: calc(var(--u) * 1);
+}
+.ctrlRow:last-child { margin-bottom: 0; }
+.ctrlRow.actions { flex-wrap: wrap; }
+
+#controls input[type="text"], #controls #user {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #1f2937;
+  color: #fff;
+  font: inherit;
+}
+#controls input:focus { outline: none; border-color: #60a5fa; }
+
+#controls button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: #374151;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+#controls button:hover { background: #4b5563; }
+#controls button.goldBtn {
+  background: linear-gradient(180deg, #d97706, #b45309);
+  color: #fff;
+}
+#controls button.goldBtn:hover {
+  background: linear-gradient(180deg, #f59e0b, #d97706);
+}
+#controls button.roseBtn {
+  background: linear-gradient(180deg, #e11d48, #be123c);
+  color: #fff;
+}
+#controls button.roseBtn:hover {
+  background: linear-gradient(180deg, #f43f5e, #e11d48);
+}
+
+#controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+#controls label input { flex: 1; }
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex: none;
+}
+.dot.warn { background: #f59e0b; }
+.dot.ok   { background: #10b981; }
+
+/* ==============================================================
+   SPLIT-SCREEN MODE (Printer Top 53% + Roblox Video Bottom 47%)
+   ============================================================== */
+#robloxSection {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--u) * 94);
+  bottom: 0;
+  background: #090a0f;
+  overflow: hidden;
+  z-index: 6;
+  border-top: calc(var(--u) * 0.4) solid #1e1308;
+  box-shadow: inset 0 calc(var(--u) * 3) calc(var(--u) * 5) rgba(0,0,0,0.9);
+}
+
+body.split #scene {
+  height: calc(var(--u) * 94);
+  bottom: auto;
+}
+
+body.split #desk {
+  height: calc(var(--u) * 76);
+}
+
+body.split #paperFlat {
+  height: calc(var(--u) * 72);
+}
+
+body.split #paperRollover {
+  top: calc(var(--u) * 71.6);
+}
+
+body.split #paperHang {
+  top: calc(var(--u) * 73);
+  height: calc(var(--u) * 32);
+}
+
+body.split #robloxSection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#robloxVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.robloxPlaceholder {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: calc(var(--u) * 3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 1.5);
+  background: radial-gradient(circle, rgba(20,24,35,0.85) 0%, rgba(9,10,15,0.95) 100%);
+  border: 1px dashed rgba(255,255,255,0.18);
+  border-radius: calc(var(--u) * 2);
+  max-width: 85%;
+}
+
+.robloxBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: linear-gradient(90deg, #ef4444, #f97316);
+  color: #fff;
+  font-weight: 900;
+  font-size: calc(var(--u) * 1.8);
+  border-radius: 99px;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+}
+
+.robloxDesc {
+  color: #9ca3af;
+  font-size: calc(var(--u) * 1.5);
+  line-height: 1.4;
+}
+
+.robloxDesc code {
+  color: #60a5fa;
+  background: rgba(0,0,0,0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.browseBtn {
+  margin-top: calc(var(--u) * 0.8);
+  padding: 8px 18px !important;
+  font-size: calc(var(--u) * 1.6);
+  background: linear-gradient(180deg, #3b82f6, #1d4ed8) !important;
+  border-radius: 8px !important;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transition: transform 0.15s, background 0.15s;
+}
+.browseBtn:hover {
+  background: linear-gradient(180deg, #60a5fa, #2563eb) !important;
+  transform: translateY(-1px);
+}
+
+.splitControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toggleLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+.toggleLabel input {
+  cursor: pointer;
+}
+.smBtn {
+  padding: 5px 10px !important;
+  font-size: 12px;
+}
+
+/* ==============================================================
+   PHASE 5: PHYSICAL VVIP STAMP MECHANISM & IMPRESSION
+   ============================================================== */
+#vvipStampArm {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: calc(var(--u) * 22);
+  height: calc(var(--u) * 46);
+  margin-left: calc(var(--u) * -11);
+  pointer-events: none;
+  z-index: 22;
+  transform: translate3d(calc(var(--u) * 3), calc(var(--u) * -52), 0) rotate(-7.5deg) scale(1.25);
+  opacity: 0;
+  transform-origin: 50% 100%;
+}
+
+#vvipStampArm.stamping {
+  animation: physicalStampCycle 1.05s cubic-bezier(0.25, 1, 0.35, 1) forwards;
+}
+
+@keyframes physicalStampCycle {
+  0% {
+    opacity: 0;
+    transform: translate3d(calc(var(--u) * 4), calc(var(--u) * -52), 0) rotate(-8deg) scale(1.3);
+  }
+  15% {
+    opacity: 1;
+  }
+  42% {
+    /* Touchdown onto paper */
+    transform: translate3d(0, calc(var(--u) * 14.5), 0) rotate(-6.8deg) scale(1.0);
+  }
+  50% {
+    /* Hard press squash */
+    transform: translate3d(0, calc(var(--u) * 14.8), 0) rotate(-6.2deg) scale(0.965);
+  }
+  60% {
+    /* Contact rebound */
+    transform: translate3d(0, calc(var(--u) * 14.2), 0) rotate(-6.8deg) scale(1.01);
+  }
+  75% {
+    /* Lift up away from paper */
+    opacity: 1;
+    transform: translate3d(0, calc(var(--u) * 4), 0) rotate(-7.5deg) scale(1.12);
+  }
+  100% {
+    /* Out of viewport */
+    opacity: 0;
+    transform: translate3d(calc(var(--u) * 4), calc(var(--u) * -52), 0) rotate(-8deg) scale(1.3);
+  }
+}
+
+.stampRod {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--u) * 1.3);
+  height: calc(var(--u) * 36);
+  background: linear-gradient(90deg, #334155 0%, #cbd5e1 35%, #ffffff 50%, #94a3b8 70%, #1e293b 100%);
+  box-shadow: calc(var(--u) * 1.2) calc(var(--u) * 0.8) calc(var(--u) * 2) rgba(0,0,0,0.55);
+}
+
+.stampCollet {
+  position: absolute;
+  top: calc(var(--u) * 35.5);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--u) * 3.4);
+  height: calc(var(--u) * 3);
+  background: linear-gradient(135deg, #e2e8f0 0%, #64748b 50%, #334155 100%);
+  border-radius: calc(var(--u) * 0.4);
+  box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 1.2) rgba(0,0,0,0.6);
+}
+
+.stampHead {
+  position: absolute;
+  top: calc(var(--u) * 38);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--u) * 19);
+  height: calc(var(--u) * 8);
+  background: linear-gradient(180deg, #94a3b8 0%, #64748b 30%, #334155 80%, #0f172a 100%);
+  border-radius: calc(var(--u) * 0.6);
+  box-shadow:
+    0 calc(var(--u) * 1.5) calc(var(--u) * 2.8) rgba(0,0,0,0.7),
+    inset 0 1px 1px rgba(255,255,255,0.6),
+    inset 0 -2px 3px rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stampFace {
+  width: 90%;
+  height: calc(var(--u) * 1.2);
+  background: #991b1b;
+  border-radius: 1px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.3);
+}
+
+/* Stamped ink impression appearing on paper upon contact */
+.vvipStampImpression {
+  position: absolute;
+  top: calc(var(--u) * 12.5);
+  left: 50%;
+  transform: translateX(-50%) rotate(-6deg) scale(0.9);
+  padding: calc(var(--u) * 0.6) calc(var(--u) * 2.2);
+  border: calc(var(--u) * 0.4) solid #b91c1c;
+  border-radius: calc(var(--u) * 0.5);
+  color: #b91c1c;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: calc(var(--u) * 2.7);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity 0.08s ease-in, transform 0.15s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  pointer-events: none;
+  z-index: 5;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.7 0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0.25 0'/%3E%3C/filter%3E%3Crect width='80' height='40' filter='url(%23n)'/%3E%3C/svg%3E"),
+    rgba(254, 226, 226, 0.45);
+  box-shadow: inset 0 0 calc(var(--u) * 0.5) rgba(185, 28, 28, 0.3);
+}
+
+.cardVvip.stamped .vvipStampImpression {
+  opacity: 0.95;
+  transform: translateX(-50%) rotate(-6deg) scale(1.0);
+}
+
+/* ==============================================================
+   PHASE 6: CAMERA-LOOK OVERLAY (Vignette, Grain, Grading)
+   ============================================================== */
+#cameraOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 18;
+  background: radial-gradient(ellipse at 50% 45%, transparent 66%, rgba(14, 8, 3, 0.32) 100%);
+}
+
+/* ==============================================================
+   PHASE 0 & 7: DEBUG REFERENCE OVERLAY (?ref=N & ?ref=N&flip=1)
+   ============================================================== */
+#refOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+
+#refOverlay.hidden {
+  display: none !important;
+}
+
+#refOverlay.flipped {
+  opacity: 1 !important;
+  background: #000;
+}
+
+#refOverlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.refLabel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fbbf24;
+  font-size: 13px;
+  font-family: monospace;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #d97706;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
