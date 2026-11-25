@@ -140,8 +140,10 @@
     camera.updateProjectionMatrix();
 
     renderer.setSize(w, h, false);
-    // Cap pixelRatio at 1.5 for crisp text & lines without 2x-4x HiDPI GPU overload
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    // Render at a minimum internal resolution (~1280px tall) so small browser windows / OBS / TikTok Studio
+    // captures stay sharp instead of being upscaled from a tiny canvas. Capped at 2x to protect laptops.
+    const dpr = window.devicePixelRatio || 1;
+    renderer.setPixelRatio(Math.min(2, Math.max(dpr, 1280 / Math.max(1, h))));
     markSceneDirty(true);
   }
   window.addEventListener("resize", resizeRenderer);
@@ -264,6 +266,9 @@
   // 2. THE DYNAMIC PRINT BUFFER & THROTTLED CANVASTEXTURE (STEP 2)
   // =========================================================================
   const BUFFER_W = 1024, BUFFER_H = 2048;
+  // Small safety gap below the top beam: cards start this many px lower so the pen carriage never
+  // slides into / under the back frame while drawing the top edge or the VIP crown.
+  const TOP_GAP = 120;
   const printCanvas = document.createElement("canvas");
   printCanvas.width = BUFFER_W; printCanvas.height = BUFFER_H;
   const pCtx = printCanvas.getContext("2d");
@@ -307,11 +312,13 @@
 
   const paperTexture = new THREE.CanvasTexture(printCanvas);
   paperTexture.needsUpdate = true;
-  // Disable mipmap regeneration on every canvas upload (avoids 11-level glGenerateMipmap GPU stall)
-  paperTexture.generateMipmaps = false;
-  paperTexture.anisotropy = 1;
-  paperTexture.minFilter = THREE.LinearFilter;
+  // Mipmaps + anisotropic filtering keep names & photos crisp on the tilted paper (no shimmering/blur)
+  paperTexture.generateMipmaps = true;
+  paperTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  paperTexture.minFilter = THREE.LinearMipmapLinearFilter;
   paperTexture.magFilter = THREE.LinearFilter;
+  pCtx.imageSmoothingEnabled = true;
+  pCtx.imageSmoothingQuality = "high";
   // Canvas pixels are sRGB: flag them so ink/photos are not double-gamma-brightened (washed-out prints)
   paperTexture.encoding = THREE.sRGBEncoding;
 
@@ -618,10 +625,10 @@
           resolve(resImg);
         }
       };
-      // 4.5s timeout to give live TikTok CDN proxy plenty of time during active streams
+      // 3s timeout: never hold up the printer waiting on a slow CDN avatar
       const timer = setTimeout(() => {
         finish(createFallbackAvatar(nameFallback), false);
-      }, 4500);
+      }, 3000);
 
       img.onload = () => {
         clearTimeout(timer);
@@ -1625,7 +1632,7 @@
 
     // Phase 4: Pen returns home before physical mechanical stamp drops
     timeline.to(carriageGroup.position, { x: 0, duration: 0.28 / speed });
-    timeline.to(gantryGroup.position, { z: -5.15, duration: 0.28 / speed }, "<");
+    timeline.to(gantryGroup.position, { z: -4.78, duration: 0.28 / speed }, "<");
 
     // Physical Stamp Mechanism Drop, Rebound & Complete Retraction out of sight
     timeline.call(() => {
@@ -1701,6 +1708,17 @@
   }
 
   let lastRowWasPair = false; // Alternates 1-centered card row and 2-card side-by-side pair row like reference "v"
+  let openRightSlot = false;  // True when Left column (x=50) on current row is filled and Right (x=539) is open
+  let openLeftHandle = "";    // Tracks left card user so same user isn't placed next to themselves
+  let lastCardX = 294;        // Tracks previous single-card X position so cards never repeat in one straight line
+
+  function drawSmallCard(tl, cardX, cardY, g, avImg, isTap) {
+    if (isTap) {
+      animateTapCard(tl, cardX, cardY, 435, 340, g.name, avImg, g.taps || 50);
+    } else {
+      animateStandardCard(tl, cardX, cardY, 435, 340, g.name, avImg);
+    }
+  }
 
   function enqueue(g) {
     lastGiftTimestamp = Date.now();
@@ -1745,7 +1763,7 @@
   function enqueueTap(t) {
     if (chkDrawTaps && !chkDrawTaps.checked) return;
     // Strictly prioritize gifters: if gifts are waiting or a gift arrived within 20s, suppress tappers!
-    if (queue.length > 0 || (Date.now() - lastGiftTimestamp < 20000)) {
+    if (queue.length > 0 || (Date.now() - lastGiftTimestamp < 10000)) {
       return;
     }
     if (!t.avatar) {
@@ -1771,7 +1789,7 @@
   async function processQueue() {
     if (isPrinting) return;
     const hasGifts = queue.length > 0;
-    const canPrintTap = tapQueue.length > 0 && (Date.now() - lastGiftTimestamp > 15000) && (!chkDrawTaps || chkDrawTaps.checked);
+    const canPrintTap = tapQueue.length > 0 && (Date.now() - lastGiftTimestamp > 10000) && (!chkDrawTaps || chkDrawTaps.checked);
     if (!hasGifts && !canPrintTap) return;
 
     isPrinting = true;
@@ -1785,7 +1803,7 @@
         if (queue.length > 0) {
           g1 = queue.shift();
           isTap = false;
-        } else if (tapQueue.length > 0 && (Date.now() - lastGiftTimestamp > 15000) && (!chkDrawTaps || chkDrawTaps.checked)) {
+        } else if (tapQueue.length > 0 && (Date.now() - lastGiftTimestamp > 10000) && (!chkDrawTaps || chkDrawTaps.checked)) {
           // No gifts queued and no gifts in last 15s (e.g. beginning of stream warmup)
           g1 = tapQueue.shift();
           isTap = true;
@@ -1799,15 +1817,14 @@
         const effectiveSpeed = speed * speedMultiplier;
 
         const tl = gsap.timeline({ onUpdate: () => markSceneDirty(true) });
+        // Apply backlog acceleration to the actual card drawing (not just the return-home move)
+        const baseSpeed = speed;
+        speed = effectiveSpeed;
 
         try {
-          if (isTap) {
-            lastRowWasPair = false;
-            showPill(`❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!`);
-            const av1 = await loadImg(g1.avatar, g1.name);
-            scrollBuffer(385);
-            animateTapCard(tl, 294, 50, 435, 340, g1.name, av1, g1.taps || 50);
-          } else if (g1.isVvip) {
+          if (g1.isVvip) {
+            openRightSlot = false;
+            openLeftHandle = "";
             lastRowWasPair = false;
             showPill(`👑 ${g1.rankText || 'TOP 1'}: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
             const [av1, crownImg] = await Promise.all([
@@ -1817,51 +1834,112 @@
             showVipBanner(g1, av1);
             // Scroll buffer down by 565px and start at y = 65 so parked carriage never covers the TOP 1 crown
             scrollBuffer(565);
-            animateVvipCard(tl, 65, g1.name, av1, g1.rank, g1.rankText || "TOP 1", crownImg, g1.handle || g1.name);
+            animateVvipCard(tl, 65 + TOP_GAP, g1.name, av1, g1.rank, g1.rankText || "TOP 1", crownImg, g1.handle || g1.name);
           } else if (g1.isBig) {
+            openRightSlot = false;
+            openLeftHandle = "";
             lastRowWasPair = false;
             showPill(`🍩 BIG GIFT: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
             const av1 = await loadImg(g1.avatar, g1.name);
             showVipBanner(g1, av1);
             // Scroll buffer down by 465px for Big Card (golden avatar ring)
             scrollBuffer(465);
-            animateBigCard(tl, 55, g1.name, av1);
+            animateBigCard(tl, 55 + TOP_GAP, g1.name, av1);
           } else {
-            // Standard gifts: Staggered 1-Centered / 2-Pair alternating layout matching reference "v"
-            // Never pair the same person with themselves on a 2-card row
-            const partnerIdx = (!g1.forceSingle && (g1.forcePair || !lastRowWasPair || backlog > 3))
-              ? queue.findIndex(item => !item.isVvip && !item.isBig && !item.forceSingle && (g1.forcePair || (item.handle !== g1.handle && item.name !== g1.name)))
-              : -1;
+            // Standard gifts & Tap Heroes: smart 2-column (Left -> Right) & 1-centered staggered layout
+            // Works both when gifts arrive in bursts AND when they trickle in one at a time!
+            const g1Handle = String(g1.handle || g1.name || "").toLowerCase();
 
-            if (partnerIdx !== -1) {
-              const g2 = queue.splice(partnerIdx, 1)[0];
+            if (openRightSlot && !g1.forceSingle && g1Handle !== openLeftHandle) {
+              // Different user arrived: fill the empty Right slot on the current row without scrolling!
+              openRightSlot = false;
+              openLeftHandle = "";
               lastRowWasPair = true;
-              showPill(`🌹 Print x2: ${g1.name} & ${g2.name}`);
-              const [av1, av2] = await Promise.all([loadImg(g1.avatar, g1.name), loadImg(g2.avatar, g2.name)]);
-              scrollBuffer(385);
-              animateStandardCard(tl, 50, 50, 435, 340, g1.name, av1);
-              animateStandardCard(tl, 539, 50, 435, 340, g2.name, av2);
+              lastCardX = 539;
+              showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print (Right): ${g1.name}`);
+              const av1 = await loadImg(g1.avatar, g1.name);
+              drawSmallCard(tl, 539, 50 + TOP_GAP, g1, av1, isTap);
+            } else if (openRightSlot && !g1.forceSingle && g1Handle === openLeftHandle) {
+              // Same user arrived while Right slot was open: check if another user in queue can take Right first
+              const diffIdx = !isTap
+                ? queue.findIndex(item => !item.isVvip && !item.isBig && !item.forceSingle && String(item.handle || item.name || "").toLowerCase() !== openLeftHandle)
+                : -1;
+              if (diffIdx !== -1) {
+                // Put the different user on Right of current row, and push g1 back to front of queue for next row
+                const gRight = queue.splice(diffIdx, 1)[0];
+                queue.unshift(g1);
+                openRightSlot = false;
+                openLeftHandle = "";
+                lastRowWasPair = true;
+                lastCardX = 539;
+                showPill(`🌹 Print (Right): ${gRight.name}`);
+                const avR = await loadImg(gRight.avatar, gRight.name);
+                drawSmallCard(tl, 539, 50 + TOP_GAP, gRight, avR, false);
+              } else {
+                // Same user again with nobody else waiting: close open row and stagger to Center or Right (never straight down Left!)
+                openRightSlot = false;
+                openLeftHandle = "";
+                lastRowWasPair = false;
+                const nextX = (lastCardX === 50) ? 294 : (lastCardX === 294 ? 539 : 294);
+                lastCardX = nextX;
+                showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
+                const av1 = await loadImg(g1.avatar, g1.name);
+                scrollBuffer(385);
+                drawSmallCard(tl, nextX, 50 + TOP_GAP, g1, av1, isTap);
+              }
+            } else if (!g1.forceSingle && (g1.forcePair || !lastRowWasPair || backlog > 2)) {
+              const partnerIdx = !isTap
+                ? queue.findIndex(item => !item.isVvip && !item.isBig && !item.forceSingle && (g1.forcePair || (String(item.handle || item.name || "").toLowerCase() !== g1Handle)))
+                : -1;
+
+              if (partnerIdx !== -1) {
+                const g2 = queue.splice(partnerIdx, 1)[0];
+                openRightSlot = false;
+                openLeftHandle = "";
+                lastRowWasPair = true;
+                lastCardX = 294;
+                showPill(`🌹 Print x2: ${g1.name} & ${g2.name}`);
+                const [av1, av2] = await Promise.all([loadImg(g1.avatar, g1.name), loadImg(g2.avatar, g2.name)]);
+                scrollBuffer(385);
+                animateStandardCard(tl, 50, 50 + TOP_GAP, 435, 340, g1.name, av1);
+                animateStandardCard(tl, 539, 50 + TOP_GAP, 435, 340, g2.name, av2);
+              } else {
+                // Start a 2-column row on the Left; next gift/tapper will fill the Right slot on the same row
+                openRightSlot = true;
+                openLeftHandle = g1Handle;
+                lastRowWasPair = false;
+                lastCardX = 50;
+                showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print (Left): ${g1.name}`);
+                const av1 = await loadImg(g1.avatar, g1.name);
+                scrollBuffer(385);
+                drawSmallCard(tl, 50, 50 + TOP_GAP, g1, av1, isTap);
+              }
             } else {
-              // Single centered card row (matching top & bottom cards in reference "v")
+              // Single centered card row (alternating after a 2-card row, or explicit Single test)
+              openRightSlot = false;
+              openLeftHandle = "";
               lastRowWasPair = false;
-              showPill(`🌹 Print: ${g1.name}`);
+              lastCardX = 294;
+              showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
               const av1 = await loadImg(g1.avatar, g1.name);
               scrollBuffer(385);
-              animateStandardCard(tl, 294, 50, 435, 340, g1.name, av1);
+              drawSmallCard(tl, 294, 50 + TOP_GAP, g1, av1, isTap);
             }
           }
 
           // Return home tucked close to the top beam (z = -5.15) so the printed card below is 100% clear
           tl.to(carriageGroup.position, { x: 0, duration: 0.25 / effectiveSpeed });
-          tl.to(gantryGroup.position, { z: -5.15, duration: 0.25 / effectiveSpeed }, "<");
+          tl.to(gantryGroup.position, { z: -4.78, duration: 0.25 / effectiveSpeed }, "<");
           tl.call(() => {
             ledMat.color.setHex(0x38bdf8);
             penGlowLight.color.setHex(0x38bdf8);
             markSceneDirty(true);
           });
 
+          speed = baseSpeed;
           await tl;
         } catch (cardErr) {
+          speed = baseSpeed;
           console.error("Card drawing error (skipping gracefully):", cardErr);
         }
       }
@@ -1873,11 +1951,17 @@
     }
   }
 
+  // Wake the printer for waiting tappers once the gift rush has calmed down
+  setInterval(() => { if (!isPrinting && tapQueue.length) processQueue(); }, 2000);
+
   // Clear Paper Action
   function clearPaper() {
     queue.length = 0;
     tapQueue.length = 0;
+    openRightSlot = false;
+    openLeftHandle = "";
     lastRowWasPair = false;
+    lastCardX = 294;
     hideVipBanner();
     fillPaperBase(pCtx, 0, BUFFER_H);
     markPaperDirty(true);

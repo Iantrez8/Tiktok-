@@ -82,7 +82,7 @@ def fetch_and_cache_image(url: str) -> tuple[bytes | None, str]:
                     "Referer": "https://www.tiktok.com/"
                 }
             )
-            with urllib.request.urlopen(req, timeout=4.5) as r:
+            with urllib.request.urlopen(req, timeout=2.5) as r:
                 data = r.read(3_000_000)
                 ctype = r.headers.get("Content-Type", "image/jpeg")
                 if data and len(data) > 100:
@@ -109,7 +109,8 @@ class Hub:
         self.task: asyncio.Task | None = None
         self.stop_flag = False
         self.pending_streaks: dict[tuple, dict] = {}
-        self.emitted_streaks: dict[tuple, int] = {}
+        self.emitted_streaks: dict[tuple, dict] = {}
+        self.seen_msg_ids: dict[str, float] = {}
         self.user_coins: dict[str, int] = {}
         self.user_taps: dict[str, int] = {}
         self.last_tap_emitted: dict[str, float] = {}
@@ -278,16 +279,27 @@ class Hub:
                 delay = min(delay * 1.5, 30)
 
     async def handle_gift(self, event):
-        self.last_gift_time = asyncio.get_event_loop().time()
+        now = asyncio.get_event_loop().time()
+        self.last_gift_time = now
         gift = getattr(event, "gift", None)
         user = getattr(event, "user", None)
         if not user and not gift:
             return
 
+        # Deduplicate exact TikTok message replays on stream reconnect
+        common = getattr(event, "common", None)
+        msg_id = str(getattr(common, "msg_id", "") or getattr(event, "order_id", "") or "")
+        if msg_id and msg_id != "0":
+            if msg_id in self.seen_msg_ids:
+                return
+            self.seen_msg_ids[msg_id] = now
+            if len(self.seen_msg_ids) > 2000:
+                self.seen_msg_ids.pop(next(iter(self.seen_msg_ids)))
+
         uid = str(getattr(user, "id", "") or getattr(user, "unique_id", "") or getattr(user, "nickname", "") or "anon")
         gid = int(getattr(event, "gift_id", 0) or getattr(gift, "id", 0) or 0)
-        group_id = str(getattr(event, "group_id", "") or "")
-        streak_key = (uid, gid, group_id)
+        raw_group = getattr(event, "group_id", "") or ""
+        group_id = str(raw_group) if raw_group else ""
 
         count = max(1, int(getattr(event, "repeat_count", 1) or getattr(event, "combo_count", 1) or 1))
         is_streakable = bool(
@@ -295,80 +307,80 @@ class Hub:
             or getattr(gift, "combo", False)
             or getattr(gift, "type", 0) == 1
         )
-        repeat_end = bool(getattr(event, "repeat_end", 0))
-        is_streaking = is_streakable and not repeat_end and not bool(getattr(event, "streaking", False) is False and repeat_end)
+        effective_group = group_id or (f"win_{int(now // 5)}" if is_streakable else "")
+        streak_key = (uid, gid, effective_group)
 
-        # Smart Streak Debouncer: TikTok's combo timer lasts ~3.2s before sending repeat_end=1.
-        # Wait 4.2s before fallback-flushing, and track emitted_streaks so repeat_end=1 never emits a duplicate!
-        if is_streaking:
-            entry = self.pending_streaks.get(streak_key)
-            if entry:
-                if count >= entry["count"]:
-                    entry["event"] = event
-                    entry["count"] = count
-                entry["timer"].cancel()
-            else:
-                entry = {"event": event, "count": count, "timer": None}
-                self.pending_streaks[streak_key] = entry
-
-            async def _flush_later(k=streak_key):
-                await asyncio.sleep(4.2)
-                popped = self.pending_streaks.pop(k, None)
-                if popped:
-                    self.emitted_streaks[k] = popped["count"]
-                    if len(self.emitted_streaks) > 1000:
-                        self.emitted_streaks.pop(next(iter(self.emitted_streaks)))
-                    await self._emit_gift(popped["event"], popped["count"])
-
-            entry["timer"] = asyncio.create_task(_flush_later())
+        # INSTANT streak handling: print the gifter on the very FIRST packet (zero waiting).
+        # Later packets of the same streak are ignored, unless the combo grows into a higher
+        # tier (e.g. 1 Rose -> 100 Roses), in which case one upgrade card (Big / VIP) is sent.
+        if not (is_streakable and effective_group):
+            await self._emit_gift(event, count)
             return
 
-        # Final streak packet (repeat_end=1) or non-streakable gift:
-        popped = self.pending_streaks.pop(streak_key, None)
-        if popped:
-            if popped["timer"]:
-                popped["timer"].cancel()
-            count = max(count, popped["count"])
-
-        # If fallback timer already emitted this exact streak, skip the late repeat_end=1 duplicate!
-        if is_streakable and group_id and self.emitted_streaks.get(streak_key, 0) >= count:
-            return
-        if group_id:
-            self.emitted_streaks[streak_key] = count
+        gname = (getattr(gift, "name", "") or "").lower()
+        unit = self._unit_coins(gift)
+        tier = self._tier(gname, unit, unit * count)
+        prev = self.emitted_streaks.get(streak_key)
+        if prev is None:
+            counted = await self._emit_gift(event, count)
+            self.emitted_streaks[streak_key] = {"count": count, "tier": tier, "coins": counted}
             if len(self.emitted_streaks) > 1000:
                 self.emitted_streaks.pop(next(iter(self.emitted_streaks)))
+            return
+        if count <= prev["count"]:
+            return
+        prev["count"] = count
+        if tier > prev["tier"]:
+            prev["tier"] = tier
+            prev["coins"] = await self._emit_gift(event, count, already_counted=prev["coins"])
+        else:
+            # keep leaderboard coins accurate without printing a duplicate card
+            user_key = self._user_key(getattr(event, "user", None))
+            extra = unit * count - prev["coins"]
+            if extra > 0:
+                self.user_coins[user_key] = self.user_coins.get(user_key, 0) + extra
+                prev["coins"] += extra
 
-        await self._emit_gift(event, count)
+    @staticmethod
+    def _unit_coins(gift) -> int:
+        gname = (getattr(gift, "name", "") or "").lower()
+        raw = int(getattr(gift, "diamond_count", 0) or 0)
+        return max(1, raw if raw > 0 else KNOWN_GIFT_COINS.get(gname, 1))
 
-    async def _emit_gift(self, event, count: int):
+    @staticmethod
+    def _tier(gname: str, unit: int, total: int) -> int:
+        if total >= 99 or unit >= 99 or gname in VIP_GIFT_NAMES:
+            return 2
+        return 1 if (total >= 20 or unit >= 20) else 0
+
+    @staticmethod
+    def _user_key(user) -> str:
+        handle = getattr(user, "unique_id", "") or getattr(user, "display_id", "") or ""
+        return (handle or getattr(user, "nickname", "") or "viewer").lower()
+
+    async def _emit_gift(self, event, count: int, already_counted: int = 0) -> int:
         gift = getattr(event, "gift", None)
         user = getattr(event, "user", None)
         gname = getattr(gift, "name", "") or "Gift"
 
         # Calculate true TikTok diamond/coin value of the gift
-        raw_diamonds = int(getattr(gift, "diamond_count", 0) or 0)
-        unit_coins = max(1, raw_diamonds if raw_diamonds > 0 else KNOWN_GIFT_COINS.get(gname.lower(), 1))
+        unit_coins = self._unit_coins(gift)
         total_coins = count * unit_coins
 
         handle = getattr(user, "unique_id", "") or getattr(user, "display_id", "") or ""
         nickname = getattr(user, "nickname", "") or handle or "Viewer"
         user_key = (handle or nickname).lower()
 
-        self.user_coins[user_key] = self.user_coins.get(user_key, 0) + total_coins
+        self.user_coins[user_key] = self.user_coins.get(user_key, 0) + max(0, total_coins - already_counted)
         sorted_users = sorted(self.user_coins.keys(), key=lambda k: self.user_coins[k], reverse=True)
         rank = sorted_users.index(user_key) + 1 if user_key in sorted_users else 1
 
-        is_vvip = (
-            total_coins >= 99
-            or unit_coins >= 99
-            or gname.lower() in VIP_GIFT_NAMES
-        )
-        gift_type = "vvip" if is_vvip else ("big" if total_coins >= 20 or unit_coins >= 20 else "normal")
+        tier = self._tier(gname.lower(), unit_coins, total_coins)
+        is_vvip = tier == 2
+        gift_type = ("normal", "big", "vvip")[tier]
 
+        # No pre-fetch wait here: the browser loads the avatar through /img immediately (zero added delay)
         raw_avatar = extract_best_avatar(user)
-        # Pre-warm the avatar cache in a worker thread so the browser receives it in <1ms without timing out
-        if raw_avatar.startswith("https://"):
-            await asyncio.to_thread(fetch_and_cache_image, raw_avatar)
         avatar_url = f"/img?u={urllib.parse.quote(raw_avatar)}" if raw_avatar.startswith("http") else raw_avatar
 
         raw_icon = first_url(getattr(gift, "image", None)) or first_url(getattr(gift, "icon", None))
@@ -391,6 +403,7 @@ class Hub:
             "giftType": gift_type,
             "vvip": is_vvip,
         })
+        return total_coins
 
     async def handle_like(self, event):
         user = getattr(event, "user", None)
@@ -403,50 +416,31 @@ class Hub:
             return
 
         now = asyncio.get_event_loop().time()
-        # Strictly prioritize gifts: if any gift arrived in the last 20 seconds, ignore tappers!
-        if now - self.last_gift_time < 20.0:
+        # Gifts always come first: ignore tappers while gifts are flowing (last 10 seconds)
+        if now - self.last_gift_time < 10.0:
             return
 
         count = max(1, int(getattr(event, "count", 1) or 1))
         self.user_taps[user_key] = self.user_taps.get(user_key, 0) + count
         total_taps = self.user_taps[user_key]
 
-        # Minimum tap milestone to qualify for drawing
-        if total_taps < 15:
+        # Instant: as soon as a viewer reaches 10 taps they are sent (once per 90s per viewer)
+        if total_taps < 10 or now - self.last_tap_emitted.get(user_key, -1e9) < 90.0:
             return
+        self.last_tap_emitted[user_key] = now
 
-        existing_timer = self.tap_timers.get(user_key)
-        if existing_timer and not existing_timer.done():
-            existing_timer.cancel()
-
-        async def _emit_tapper_later(u=user, k=user_key, nick=nickname, h=handle):
-            await asyncio.sleep(2.5)
-            self.tap_timers.pop(k, None)
-            t_now = asyncio.get_event_loop().time()
-            if t_now - self.last_gift_time < 20.0:
-                return  # Gifts have resumed, abort tap emit!
-            if t_now - self.last_tap_emitted.get(k, 0) < 60.0:
-                return  # Rate limit per tapper: 60s
-            self.last_tap_emitted[k] = t_now
-
-            taps = self.user_taps.get(k, 15)
-            raw_avatar = extract_best_avatar(u)
-            if raw_avatar.startswith("https://"):
-                await asyncio.to_thread(fetch_and_cache_image, raw_avatar)
-            avatar_url = f"/img?u={urllib.parse.quote(raw_avatar)}" if raw_avatar.startswith("http") else raw_avatar
-
-            print(f"[Tapper] @{h or nick} tapped {taps} likes! Queued for idle drawing.", flush=True)
-            await self.broadcast({
-                "type": "tap",
-                "name": nick,
-                "handle": h or nick,
-                "avatar": avatar_url,
-                "taps": taps,
-                "gift": f"❤️ {taps} Taps",
-                "isTap": True,
-            })
-
-        self.tap_timers[user_key] = asyncio.create_task(_emit_tapper_later())
+        raw_avatar = extract_best_avatar(user)
+        avatar_url = f"/img?u={urllib.parse.quote(raw_avatar)}" if raw_avatar.startswith("http") else raw_avatar
+        print(f"[Tapper] @{handle or nickname} tapped {total_taps} likes!", flush=True)
+        await self.broadcast({
+            "type": "tap",
+            "name": nickname,
+            "handle": handle or nickname,
+            "avatar": avatar_url,
+            "taps": total_taps,
+            "gift": f"❤️ {total_taps} Taps",
+            "isTap": True,
+        })
 
     # ----------------------------------------------------------------- Simulation
     async def simulate(self):
@@ -494,32 +488,23 @@ KNOWN_GIFT_COINS = {
 
 
 def extract_best_avatar(user) -> str:
-    """Extract the most browser-compatible (JPEG/PNG/WebP, non-HEIC) avatar URL from a TikTok user."""
+    """Pick the sharpest browser-compatible (non-HEIC) avatar: large/medium (720px+) before 100px thumbs."""
     if not user:
         return ""
-    candidates: list[str] = []
-    for field in ("avatar_jpg", "avatar_medium", "avatar_large", "avatar_thumb"):
+    fallback = ""
+    for field in ("avatar_large", "avatar_medium", "avatar_jpg", "avatar_thumb"):
         obj = getattr(user, field, None)
         if not obj:
             continue
         for attr in ("url_list", "m_urls", "urls"):
-            urls = getattr(obj, attr, None)
-            if urls:
-                for u in urls:
-                    if u and str(u).startswith("http"):
-                        candidates.append(str(u))
-    if not candidates:
-        return ""
-    # Prefer JPEG/PNG over WebP, and strongly avoid .heic which Chrome on Windows cannot decode
-    for u in candidates:
-        low = u.lower().split("?")[0]
-        if (".jpeg" in low or ".jpg" in low or ".png" in low) and ".heic" not in low:
-            return u
-    for u in candidates:
-        low = u.lower().split("?")[0]
-        if ".heic" not in low:
-            return u
-    return candidates[-1]
+            for u in (getattr(obj, attr, None) or []):
+                u = str(u or "")
+                if not u.startswith("http"):
+                    continue
+                if ".heic" not in u.lower().split("?")[0]:
+                    return u
+                fallback = fallback or u
+    return fallback
 
 
 def first_url(obj) -> str:
