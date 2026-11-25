@@ -5,17 +5,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TikTok LIVE Virtual Pencil Printer</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 
 <body>
   <div id="stage">
 
-    <!-- Main 3D WebGL Pen Plotter Scene (Clean full-height scene matching real stream) -->
+    <!-- Main 3D WebGL Pen Plotter Scene -->
     <main id="scene">
       <canvas id="canvas3d"></canvas>
-
-      <!-- Camera-look overlay for webcam photorealism -->
       <div id="cameraOverlay"></div>
     </main>
 
@@ -29,22 +27,43 @@
       </div>
     </section>
 
-    <!-- Golden VIP Shoutout Banner (Appears on screen for VIP / Expensive Gifters) -->
+    <!-- Golden Shoutout Banner ("FOLLOW @username" floating over paper area) -->
     <div id="vipBanner" class="hidden">
       <img id="vipBannerAvatar" src="" alt="">
       <div class="vipBannerBody">
-        <div id="vipBannerBadge" class="vipBannerBadge">👑 TOP 1 VIP GIFTER</div>
+        <div id="vipBannerBadge" class="vipBannerBadge">👑 TOP 1 VVIP GIFTER</div>
         <div id="vipBannerFollow" class="vipBannerFollow">FOLLOW @username</div>
-        <div id="vipBannerGift" class="vipBannerGift">Sent Universe • 1,000 coins</div>
       </div>
     </div>
 
-  <!-- Golden VIP Shoutout Banner (Appears on screen for VIP / Expensive Gifters) -->
-  <div id="vipBanner" class="hidden">
-    <img id="vipBannerAvatar" src="" alt="">
-    <div class="vipBannerBody">
-      <div id="vipBannerBadge" class="vipBannerBadge">👑 TOP 1 VVIP GIFTER</div>
-      <div id="vipBannerFollow" class="vipBannerFollow">FOLLOW @username</div>
+    <!-- Live Action Pill (TikTok comment / queue status) -->
+    <div id="livePill" class="hidden">
+      <span id="pillText">Ready for TikTok LIVE gifts</span>
+    </div>
+
+    <!-- Gift Tiers Menu Card (Bottom-Right) -->
+    <div id="giftLegend">
+      <div class="legendRow">
+        <div class="legendIconWrap">
+          <span class="legendGiftIcon">🌹</span>
+          <span class="legendCoinBadge"><span class="coinDot"></span>1</span>
+        </div>
+        <div class="legendPill">Print</div>
+      </div>
+      <div class="legendRow">
+        <div class="legendIconWrap">
+          <span class="legendGiftIcon">🍩</span>
+          <span class="legendCoinBadge"><span class="coinDot"></span>30</span>
+        </div>
+        <div class="legendPill">Big</div>
+      </div>
+      <div class="legendRow">
+        <div class="legendIconWrap">
+          <span class="legendGiftIcon">💎</span>
+          <span class="legendCoinBadge"><span class="coinDot"></span>100</span>
+        </div>
+        <div class="legendPill">Legendary VVIP</div>
+      </div>
     </div>
 
     <!-- Streamer Control Panel (Collapsible to keep stream view 100% clean) -->
@@ -99,7 +118,7 @@
   <script src="lib/three.min.js"></script>
   <script src="lib/gsap.min.js"></script>
   <script src="avatars_data.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=4"></script>
 </body>
 
 </html>

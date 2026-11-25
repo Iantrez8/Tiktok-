@@ -915,6 +915,82 @@ body.split #vipBanner {
 }
 
 /* ==============================================================
+   GIFT TIERS LEGEND CARD (Bottom-Right Overlay)
+   ============================================================== */
+#giftLegend {
+  position: absolute;
+  right: calc(var(--u) * 2.2);
+  bottom: calc(var(--u) * 14);
+  width: calc(var(--u) * 44);
+  padding: calc(var(--u) * 1.8) calc(var(--u) * 2.0);
+  background: rgba(14, 15, 19, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: calc(var(--u) * 1.4);
+  box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 2.0) rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 1.35);
+  z-index: 42;
+  pointer-events: none;
+}
+
+#giftLegend.hidden {
+  display: none;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.5);
+}
+
+.legendIconWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(var(--u) * 7.0);
+  flex-shrink: 0;
+}
+
+.legendGiftIcon {
+  font-size: calc(var(--u) * 4.4);
+  line-height: 1.05;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+
+.legendCoinBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.45);
+  font-size: calc(var(--u) * 1.6);
+  font-weight: 700;
+  color: #f8fafc;
+  margin-top: calc(var(--u) * 0.2);
+}
+
+.coinDot {
+  width: calc(var(--u) * 1.45);
+  height: calc(var(--u) * 1.45);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fef08a, #eab308 65%, #a16207 100%);
+  box-shadow: 0 0 3px rgba(250, 204, 21, 0.65);
+  display: inline-block;
+}
+
+.legendPill {
+  flex: 1;
+  background: rgba(44, 46, 54, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: calc(var(--u) * 0.85);
+  padding: calc(var(--u) * 1.15) calc(var(--u) * 1.6);
+  color: #f1f5f9;
+  font-size: calc(var(--u) * 2.2);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ==============================================================
    STREAMER CONTROLS PANEL (Hide with ?controls=0, collapsible)
    ============================================================== */
 #controls {

@@ -19,6 +19,10 @@
   const livePill = $("livePill");
   const pillText = $("pillText");
   const chkSplit = $("chkSplit");
+  const giftLegend = $("giftLegend");
+  if (giftLegend && q.get("legend") === "0") {
+    giftLegend.classList.add("hidden");
+  }
   const robloxVideo = $("robloxVideo");
   const robloxPlaceholder = $("robloxPlaceholder");
   const videoInput = $("videoInput");
