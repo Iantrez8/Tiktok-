@@ -344,6 +344,7 @@
 
     fillPaperBase(pCtx, 0, pixels + 5);
     markPaperDirty(true);
+    playPaperFeedSound();
   }
 
   // =========================================================================
@@ -546,10 +547,211 @@
     return -6.05 + (cy / BUFFER_H) * totalL;
   }
 
+  // =========================================================================
+  // 3B. PENCIL ASMR & PRINTER SOUND ENGINE (Web Audio API, 0 KB assets)
+  // =========================================================================
+  const chkPencilSfx = $("chkPencilSfx");
+  if (chkPencilSfx && q.get("sfx") === "0") chkPencilSfx.checked = false;
+
+  let audioCtx = null;
+  let pencilGain = null;
+  let paperResonanceFilter = null;
+  let graphiteFilter = null;
+  let noiseBuffer = null;
+  let pencilFadeTimer = null;
+  let prevPenX = null, prevPenY = null, prevPenT = 0;
+
+  function isSfxEnabled() {
+    return chkPencilSfx ? chkPencilSfx.checked : (q.get("sfx") !== "0");
+  }
+
+  function ensureAudioCtx() {
+    if (!isSfxEnabled()) return null;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!audioCtx) {
+      audioCtx = new Ctx();
+      // Build 2-second textured noise buffer simulating paper grain + graphite friction
+      const sr = audioCtx.sampleRate;
+      const len = sr * 2;
+      noiseBuffer = audioCtx.createBuffer(1, len, sr);
+      const data = noiseBuffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < len; i++) {
+        const white = Math.random() * 2 - 1;
+        // Pink-ish noise shaping + subtle irregular fiber micro-bumps (~32 Hz & ~85 Hz)
+        b0 = 0.997 * b0 + white * 0.029;
+        b1 = 0.985 * b1 + white * 0.032;
+        b2 = 0.950 * b2 + white * 0.048;
+        const grain = 0.72 + 0.28 * Math.sin(i * 0.0048) * Math.cos(i * 0.0117);
+        data[i] = Math.max(-1, Math.min(1, (b0 + b1 + b2 + white * 0.28) * 1.45 * grain));
+      }
+
+      // Looping noise source -> Dual shaped bandpass filters (Paper Body + Crisp Graphite Tip) -> Master Gain
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuffer;
+      src.loop = true;
+
+      paperResonanceFilter = audioCtx.createBiquadFilter();
+      paperResonanceFilter.type = "bandpass";
+      paperResonanceFilter.frequency.value = 950;
+      paperResonanceFilter.Q.value = 1.05;
+
+      graphiteFilter = audioCtx.createBiquadFilter();
+      graphiteFilter.type = "bandpass";
+      graphiteFilter.frequency.value = 2850;
+      graphiteFilter.Q.value = 1.65;
+
+      const bodyGain = audioCtx.createGain();
+      bodyGain.gain.value = 0.55;
+      const tipGain = audioCtx.createGain();
+      tipGain.gain.value = 0.45;
+
+      pencilGain = audioCtx.createGain();
+      pencilGain.gain.value = 0;
+
+      src.connect(paperResonanceFilter);
+      src.connect(graphiteFilter);
+      paperResonanceFilter.connect(bodyGain);
+      graphiteFilter.connect(tipGain);
+      bodyGain.connect(pencilGain);
+      tipGain.connect(pencilGain);
+      pencilGain.connect(audioCtx.destination);
+      src.start();
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+    return audioCtx;
+  }
+
+  function triggerPencilStroke(cx, cy) {
+    if (!isSfxEnabled()) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx || ctx.state !== "running" || !pencilGain) return;
+
+    const now = performance.now();
+    if (prevPenX === null || now - prevPenT > 180) {
+      prevPenX = cx; prevPenY = cy; prevPenT = now;
+      return;
+    }
+    const dist = Math.hypot(cx - prevPenX, cy - prevPenY);
+    const dt = Math.max(8, now - prevPenT);
+    prevPenX = cx; prevPenY = cy; prevPenT = now;
+
+    if (dist < 0.6) return;
+
+    // Speed-responsive texture: fast border lines sound crisper, gentle curves sound softer
+    const pxPerMs = Math.min(3.5, dist / dt);
+    const targetVol = Math.min(0.18, 0.045 + pxPerMs * 0.048);
+    const t = ctx.currentTime;
+
+    graphiteFilter.frequency.setTargetAtTime(2500 + pxPerMs * 420, t, 0.02);
+    paperResonanceFilter.frequency.setTargetAtTime(860 + pxPerMs * 110, t, 0.02);
+    pencilGain.gain.setTargetAtTime(targetVol, t, 0.015);
+
+    clearTimeout(pencilFadeTimer);
+    pencilFadeTimer = setTimeout(() => {
+      if (audioCtx && pencilGain) {
+        pencilGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.022);
+      }
+      prevPenX = null;
+    }, 75);
+  }
+
+  function playPaperFeedSound() {
+    if (!isSfxEnabled()) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx || ctx.state !== "running" || !noiseBuffer) return;
+
+    const t = ctx.currentTime;
+    // Soft paper rustle
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(520, t);
+    filter.Q.value = 0.85;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.055, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(audioCtx.destination);
+    src.start(t, Math.random() * 0.8, 0.26);
+
+    // Subtle soft roller stepper hum
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(145, t);
+    osc.frequency.linearRampToValueAtTime(175, t + 0.16);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.001, t);
+    og.gain.linearRampToValueAtTime(0.014, t + 0.03);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+    osc.connect(og);
+    og.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+
+  function playStampThud() {
+    if (!isSfxEnabled()) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx || ctx.state !== "running") return;
+
+    const t = ctx.currentTime;
+    // Crisp low rubber stamp thud
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(125, t);
+    osc.frequency.exponentialRampToValueAtTime(42, t + 0.11);
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.14);
+
+    // Tiny paper contact tap
+    if (noiseBuffer) {
+      const n = ctx.createBufferSource();
+      n.buffer = noiseBuffer;
+      const f = ctx.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 780;
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.09, t);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+      n.connect(f);
+      f.connect(ng);
+      ng.connect(audioCtx.destination);
+      n.start(t, 0.1, 0.06);
+    }
+  }
+
+  if (chkPencilSfx) {
+    chkPencilSfx.onchange = () => {
+      if (!chkPencilSfx.checked && audioCtx && pencilGain) {
+        pencilGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.02);
+      } else if (chkPencilSfx.checked) {
+        ensureAudioCtx();
+      }
+    };
+  }
+  window.addEventListener("pointerdown", ensureAudioCtx, { passive: true });
+  window.addEventListener("keydown", ensureAudioCtx, { passive: true });
+
   function setPenPosition(cx, cy) {
     carriageGroup.position.x = canvasXto3D(cx);
     gantryGroup.position.z = canvasYto3D(cy);
     markSceneDirty(true);
+    triggerPencilStroke(cx, cy);
   }
 
   // =========================================================================
@@ -657,24 +859,24 @@
   const vipBannerAvatar = $("vipBannerAvatar");
   const vipBannerBadge = $("vipBannerBadge");
   const vipBannerFollow = $("vipBannerFollow");
-  const vipBannerGift = $("vipBannerGift");
   let vipBannerTimer = null;
 
   function showVipBanner(g, resolvedImg) {
     if (!vipBanner) return;
     if (vipBannerTimer) clearTimeout(vipBannerTimer);
     const cleanHandle = String(g.handle || g.name || "user").replace(/^@/, "").trim();
-    const coins = g.coins || (g.isVvip ? 1000 : (g.count || 30));
+    vipBanner.classList.toggle("tier-rose", !g.isVvip && !g.isBig);
     if (vipBannerBadge) {
-      vipBannerBadge.textContent = g.isVvip
-        ? `👑 ${g.rankText || "TOP 1"} VIP GIFTER`
-        : `🍩 BIG GIFTER • ${g.rankText || "TOP"}`;
+      vipBannerBadge.textContent = g.isTap
+        ? `❤️ TAP HERO • ${g.taps || 50} TAPS`
+        : g.isVvip
+          ? `👑 ${g.rankText || "TOP 1"} VVIP GIFTER`
+          : g.isBig
+            ? `👑 VIP • ${g.rankText || "TOP"}`
+            : `🌹 GIFTER • ${g.rankText || "TOP"}`;
     }
     if (vipBannerFollow) {
       vipBannerFollow.textContent = `FOLLOW @${cleanHandle}`;
-    }
-    if (vipBannerGift) {
-      vipBannerGift.textContent = `Sent ${g.gift || "Gift"}${g.count > 1 ? " ×" + g.count : ""} (${coins.toLocaleString()} coins)`;
     }
     if (vipBannerAvatar) {
       if (resolvedImg && resolvedImg.src) {
@@ -865,11 +1067,12 @@
     ctx.restore();
   }
 
-  // Draw Standard Card (matching Image 4 & Image 1 sequence)
-  function animateStandardCard(timeline, x, y, w, h, name, avatarImg) {
+  // Draw Standard Card (matching Image 4 & Image 1 sequence) + FOLLOW @handle
+  function animateStandardCard(timeline, x, y, w, h, name, avatarImg, handle = "") {
     const cx = x + w / 2;
-    const cy = y + h * 0.42;
-    const r = Math.min(w, h) * 0.27;
+    const cy = y + h * 0.39;
+    const r = Math.min(w, h) * 0.255;
+    const cleanHandle = String(handle || name || "user").replace(/^@/, "").trim();
 
     // Step 1: Draw First Line across the top with corner tick marks (matching Image 1)
     const topProgress = { t: 0 };
@@ -940,9 +1143,9 @@
       }
     });
 
-    // Step 3: Name handwriting with hearts
+    // Step 3: Name handwriting with hearts + FOLLOW @handle shoutout inside the card
     const nameProgress = { t: 0 };
-    const textStartX = x + 35, textEndX = x + w - 35, textY = y + h * 0.88;
+    const textStartX = x + 35, textEndX = x + w - 35, textY = y + h * 0.78;
     timeline.to(carriageGroup.position, { x: canvasXto3D(textStartX), duration: 0.18 / speed });
     timeline.to(gantryGroup.position, { z: canvasYto3D(textY), duration: 0.18 / speed }, "<");
 
@@ -951,10 +1154,14 @@
       duration: 0.55 / speed,
       ease: "none",
       onStart: () => {
-        pCtx.font = "bold 26px sans-serif";
+        pCtx.font = "bold 24px sans-serif";
         pCtx.fillStyle = "#1c1917";
         pCtx.textAlign = "center";
-        pCtx.fillText("♡ " + name + " ♡", cx, textY);
+        pCtx.fillText("♡ " + name + " ♡", cx, textY, w - 32);
+
+        pCtx.font = "900 17px 'Arial Black', Impact, sans-serif";
+        pCtx.fillStyle = "#b91c1c";
+        pCtx.fillText(`★ FOLLOW @${cleanHandle} ★`, cx, textY + 34, w - 32);
         markPaperDirty();
       },
       onUpdate: () => {
@@ -1157,13 +1364,14 @@
     });
   }
 
-  // Draw Big Card (matching Image 5: Dek_$LM@)
-  function animateBigCard(timeline, y, name, avatarImg) {
-    const w = 680, h = 420;
+  // Draw Big Card (matching Image 5: Dek_$LM@) with FOLLOW @handle shoutout inside the paper
+  function animateBigCard(timeline, y, name, avatarImg, handle = "", giftText = "", rankText = "") {
+    const w = 680, h = 450;
     const x = (BUFFER_W - w) / 2;
     const cx = BUFFER_W / 2;
-    const cy = y + 175;
-    const r = 120;
+    const cy = y + 178;
+    const r = 110;
+    const cleanHandle = String(handle || name || "vip").replace(/^@/, "").trim();
 
     // Step 1: Draw First Line across the top with corner tick marks
     const topProgress = { t: 0 };
@@ -1192,12 +1400,17 @@
         markPaperDirty();
       }
     });
-    // Draw right corner tick
+    // Draw right corner tick & BIG GIFTER badge inside the card
     timeline.call(() => {
       pCtx.beginPath();
       pCtx.moveTo(x + w, y);
       pCtx.lineTo(x + w, y + 16);
       pCtx.stroke();
+
+      pCtx.font = "900 18px sans-serif";
+      pCtx.fillStyle = "#b45309";
+      pCtx.textAlign = "center";
+      pCtx.fillText(`👑 VIP • ${rankText || "TOP"}`, cx, y + 36);
       markPaperDirty();
     });
 
@@ -1230,9 +1443,9 @@
       }
     });
 
-    // Step 3: Write Big Name with Roses and Hearts
+    // Step 3: Write Big Name, FOLLOW @handle inside paper, and gift summary
     const textProgress = { t: 0 };
-    const textStartX = cx - 220, textEndX = cx + 220, textY = y + 365;
+    const textStartX = cx - 220, textEndX = cx + 220, textY = y + 338;
     timeline.to(carriageGroup.position, { x: canvasXto3D(textStartX), duration: 0.2 / speed });
     timeline.to(gantryGroup.position, { z: canvasYto3D(textY), duration: 0.2 / speed }, "<");
 
@@ -1241,10 +1454,33 @@
       duration: 0.65 / speed,
       ease: "none",
       onStart: () => {
-        pCtx.font = "bold 34px sans-serif";
+        pCtx.font = "bold 32px sans-serif";
         pCtx.fillStyle = "#1c1917";
         pCtx.textAlign = "center";
         pCtx.fillText("♡ 🌹 " + name + " 🌹 ♡", cx, textY);
+
+        pCtx.font = "900 24px 'Arial Black', Impact, sans-serif";
+        pCtx.fillStyle = "#b91c1c";
+        pCtx.fillText(`★ FOLLOW @${cleanHandle} ★`, cx, textY + 42);
+
+        if (giftText) {
+          pCtx.font = "bold 18px sans-serif";
+          pCtx.fillStyle = "#92400e";
+          pCtx.fillText(giftText, cx, textY + 74);
+        }
+
+        // Crisp red [ VIP ] stamp inside right border of VIP (Doughnut / Big) card
+        pCtx.save();
+        pCtx.translate(x + w - 150, cy + 95);
+        pCtx.rotate(0.05);
+        pCtx.strokeStyle = "#dc2626";
+        pCtx.lineWidth = 3.5;
+        pCtx.strokeRect(0, 0, 112, 42);
+        pCtx.font = "900 24px 'Impact', 'Arial Black', sans-serif";
+        pCtx.fillStyle = "#dc2626";
+        pCtx.textAlign = "center";
+        pCtx.fillText("VIP", 56, 30);
+        pCtx.restore();
         markPaperDirty();
       },
       onUpdate: () => {
@@ -1643,7 +1879,7 @@
     timeline.to(stampGroup.position, { y: 0.45, duration: 0.28 / speed, ease: "power3.in" });
     timeline.to(stampGroup.scale, { y: 0.88, duration: 0.05 / speed });
     timeline.call(() => {
-      // Stamp Red [ VIP ] Impression neatly inside right card border
+      // Stamp Red [ VVIP ] Impression neatly inside right card border
       pCtx.save();
       pCtx.translate(x + w - 165, cy + 125);
       pCtx.rotate(0.04);
@@ -1653,9 +1889,10 @@
       pCtx.font = "900 28px 'Impact', 'Arial Black', sans-serif";
       pCtx.fillStyle = "#dc2626";
       pCtx.textAlign = "center";
-      pCtx.fillText("VIP", 65, 34);
+      pCtx.fillText("VVIP", 65, 34);
       pCtx.restore();
       markPaperDirty(true);
+      playStampThud();
     });
     timeline.to(stampGroup.scale, { y: 1.0, duration: 0.08 / speed });
     timeline.to(stampGroup.position, { y: 1.2, duration: 0.12 / speed, ease: "power1.out" });
@@ -1707,16 +1944,37 @@
     return big.includes(String(g.gift || "").toLowerCase());
   }
 
-  let lastRowWasPair = false; // Alternates 1-centered card row and 2-card side-by-side pair row like reference "v"
-  let openRightSlot = false;  // True when Left column (x=50) on current row is filled and Right (x=539) is open
+  let lastRowWasPair = false; // Tracks if previous row had 2 cards
+  let consecutivePairs = 0;   // Prevents repeating rigid 2-column grid rows back-to-back
+  let openRightSlot = false;  // True when a Left-side card left room on Right for one partner
   let openLeftHandle = "";    // Tracks left card user so same user isn't placed next to themselves
-  let lastCardX = 294;        // Tracks previous single-card X position so cards never repeat in one straight line
+  let openLeftRightEdge = 490; // Right edge of the open Left card to guarantee zero overlap
+  let lastCardX = 294;        // Tracks previous single-card X position for natural zig-zag / variety
 
-  function drawSmallCard(tl, cardX, cardY, g, avImg, isTap) {
+  const randInt = (min, max) => Math.floor(min + Math.random() * (max - min + 1));
+
+  // Pick a natural non-repeating single-card slot across Left / Center / Right
+  function pickOrganicSoloBox() {
+    const zones = [
+      { minX: 55,  maxX: 155, minW: 425, maxW: 465 }, // Left-ish
+      { minX: 235, maxX: 335, minW: 440, maxW: 495 }, // Center-ish
+      { minX: 435, maxX: 530, minW: 425, maxW: 465 }  // Right-ish
+    ];
+    // Filter out zones too close to previous single card so paper never forms one straight line
+    const choices = zones.filter(z => Math.abs(((z.minX + z.maxX) / 2) - lastCardX) > 125);
+    const zone = choices[randInt(0, choices.length - 1)] || zones[1];
+    const w = randInt(zone.minW, zone.maxW);
+    const x = Math.min(BUFFER_W - w - 45, randInt(zone.minX, zone.maxX));
+    const y = randInt(42, 66) + TOP_GAP;
+    const h = randInt(325, 348);
+    return { x, y, w, h };
+  }
+
+  function drawSmallCard(tl, cardX, cardY, g, avImg, isTap, w = 435, h = 340) {
     if (isTap) {
-      animateTapCard(tl, cardX, cardY, 435, 340, g.name, avImg, g.taps || 50);
+      animateTapCard(tl, cardX, cardY, w, h, g.name, avImg, g.taps || 50);
     } else {
-      animateStandardCard(tl, cardX, cardY, 435, 340, g.name, avImg);
+      animateStandardCard(tl, cardX, cardY, w, h, g.name, avImg, g.handle || g.name);
     }
   }
 
@@ -1826,104 +2084,94 @@
             openRightSlot = false;
             openLeftHandle = "";
             lastRowWasPair = false;
-            showPill(`👑 ${g1.rankText || 'TOP 1'}: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
+            consecutivePairs = 0;
+            lastCardX = 294;
+            showPill(`👑 VVIP ${g1.rankText || 'TOP 1'}: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
             const [av1, crownImg] = await Promise.all([
               loadImg(g1.avatar, g1.name),
-              loadImg("assets/vip_crown_top1.svg", "VIP Crown")
+              loadImg("assets/vip_crown_top1.svg", "VVIP Crown")
             ]);
             showVipBanner(g1, av1);
-            // Scroll buffer down by 565px and start at y = 65 so parked carriage never covers the TOP 1 crown
             scrollBuffer(565);
             animateVvipCard(tl, 65 + TOP_GAP, g1.name, av1, g1.rank, g1.rankText || "TOP 1", crownImg, g1.handle || g1.name);
           } else if (g1.isBig) {
             openRightSlot = false;
             openLeftHandle = "";
             lastRowWasPair = false;
-            showPill(`🍩 BIG GIFT: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
+            consecutivePairs = 0;
+            lastCardX = 294;
+            showPill(`👑 VIP: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
             const av1 = await loadImg(g1.avatar, g1.name);
             showVipBanner(g1, av1);
-            // Scroll buffer down by 465px for Big Card (golden avatar ring)
-            scrollBuffer(465);
-            animateBigCard(tl, 55 + TOP_GAP, g1.name, av1);
+            // Scroll buffer down by 490px for Big Card (golden avatar ring + FOLLOW shoutout inside paper)
+            scrollBuffer(490);
+            animateBigCard(tl, 55 + TOP_GAP, g1.name, av1, g1.handle || g1.name, "", g1.rankText || "TOP");
           } else {
-            // Standard gifts & Tap Heroes: smart 2-column (Left -> Right) & 1-centered staggered layout
-            // Works both when gifts arrive in bursts AND when they trickle in one at a time!
+            // Standard gifts & Tap Heroes: organic scrapbook flow (mixes varied solo positions & uneven pairs)
+            // Never locks into two rigid columns down the paper!
             const g1Handle = String(g1.handle || g1.name || "").toLowerCase();
 
             if (openRightSlot && !g1.forceSingle && g1Handle !== openLeftHandle) {
-              // Different user arrived: fill the empty Right slot on the current row without scrolling!
+              // Complete the pair on the Right side with organic offset
+              const xR = Math.max(openLeftRightEdge + 30, randInt(525, 560));
+              const wR = Math.min(BUFFER_W - xR - 40, randInt(412, 442));
+              const yR = randInt(42, 68) + TOP_GAP;
+              const hR = randInt(322, 348);
               openRightSlot = false;
               openLeftHandle = "";
               lastRowWasPair = true;
-              lastCardX = 539;
-              showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print (Right): ${g1.name}`);
+              consecutivePairs++;
+              lastCardX = xR;
+              showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
               const av1 = await loadImg(g1.avatar, g1.name);
-              drawSmallCard(tl, 539, 50 + TOP_GAP, g1, av1, isTap);
-            } else if (openRightSlot && !g1.forceSingle && g1Handle === openLeftHandle) {
-              // Same user arrived while Right slot was open: check if another user in queue can take Right first
-              const diffIdx = !isTap
-                ? queue.findIndex(item => !item.isVvip && !item.isBig && !item.forceSingle && String(item.handle || item.name || "").toLowerCase() !== openLeftHandle)
-                : -1;
-              if (diffIdx !== -1) {
-                // Put the different user on Right of current row, and push g1 back to front of queue for next row
-                const gRight = queue.splice(diffIdx, 1)[0];
-                queue.unshift(g1);
-                openRightSlot = false;
-                openLeftHandle = "";
-                lastRowWasPair = true;
-                lastCardX = 539;
-                showPill(`🌹 Print (Right): ${gRight.name}`);
-                const avR = await loadImg(gRight.avatar, gRight.name);
-                drawSmallCard(tl, 539, 50 + TOP_GAP, gRight, avR, false);
-              } else {
-                // Same user again with nobody else waiting: close open row and stagger to Center or Right (never straight down Left!)
-                openRightSlot = false;
-                openLeftHandle = "";
-                lastRowWasPair = false;
-                const nextX = (lastCardX === 50) ? 294 : (lastCardX === 294 ? 539 : 294);
-                lastCardX = nextX;
-                showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
-                const av1 = await loadImg(g1.avatar, g1.name);
-                scrollBuffer(385);
-                drawSmallCard(tl, nextX, 50 + TOP_GAP, g1, av1, isTap);
-              }
-            } else if (!g1.forceSingle && (g1.forcePair || !lastRowWasPair || backlog > 2)) {
-              const partnerIdx = !isTap
+              showVipBanner(g1, av1);
+              drawSmallCard(tl, xR, yR, g1, av1, isTap, wR, hR);
+            } else {
+              // Check if a different partner is waiting in queue for an optional pair row
+              const partnerIdx = (!isTap && !g1.forceSingle)
                 ? queue.findIndex(item => !item.isVvip && !item.isBig && !item.forceSingle && (g1.forcePair || (String(item.handle || item.name || "").toLowerCase() !== g1Handle)))
                 : -1;
 
-              if (partnerIdx !== -1) {
+              // Allow pair rows organically (~50% after a solo row, max 1-2 pair rows before forcing an organic solo break)
+              const wantPairNow = g1.forcePair || (!g1.forceSingle && consecutivePairs === 0 && (Math.random() < 0.55 || backlog > 6));
+
+              if (wantPairNow && partnerIdx !== -1) {
                 const g2 = queue.splice(partnerIdx, 1)[0];
+                const x1 = randInt(42, 68), w1 = randInt(412, 438), y1 = randInt(42, 66) + TOP_GAP, h1 = randInt(320, 345);
+                const x2 = Math.max(x1 + w1 + 28, randInt(525, 558)), w2 = Math.min(BUFFER_W - x2 - 40, randInt(412, 438)), y2 = randInt(42, 66) + TOP_GAP, h2 = randInt(320, 345);
                 openRightSlot = false;
                 openLeftHandle = "";
                 lastRowWasPair = true;
+                consecutivePairs++;
                 lastCardX = 294;
                 showPill(`🌹 Print x2: ${g1.name} & ${g2.name}`);
                 const [av1, av2] = await Promise.all([loadImg(g1.avatar, g1.name), loadImg(g2.avatar, g2.name)]);
-                scrollBuffer(385);
-                animateStandardCard(tl, 50, 50 + TOP_GAP, 435, 340, g1.name, av1);
-                animateStandardCard(tl, 539, 50 + TOP_GAP, 435, 340, g2.name, av2);
+                showVipBanner(g1, av1);
+                scrollBuffer(405);
+                animateStandardCard(tl, x1, y1, w1, h1, g1.name, av1, g1.handle || g1.name);
+                tl.call(() => showVipBanner(g2, av2));
+                animateStandardCard(tl, x2, y2, w2, h2, g2.name, av2, g2.handle || g2.name);
               } else {
-                // Start a 2-column row on the Left; next gift/tapper will fill the Right slot on the same row
-                openRightSlot = true;
-                openLeftHandle = g1Handle;
+                // Organic single card positioned across Left-ish / Center / Right-ish so nothing lines up in stiff tracks
+                const box = g1.forceSingle
+                  ? { x: randInt(275, 315), y: randInt(45, 62) + TOP_GAP, w: 435, h: 340 }
+                  : pickOrganicSoloBox();
+
+                // Only leave the right side open for a staggered follow-up ~50% of the time if card sits on the far left
+                const leaveRightOpen = !g1.forceSingle && consecutivePairs === 0 && box.x <= 125 && (box.x + box.w) <= 535 && Math.random() < 0.5;
+                openRightSlot = leaveRightOpen;
+                openLeftHandle = leaveRightOpen ? g1Handle : "";
+                openLeftRightEdge = box.x + box.w;
                 lastRowWasPair = false;
-                lastCardX = 50;
-                showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print (Left): ${g1.name}`);
+                consecutivePairs = 0;
+                lastCardX = box.x;
+
+                showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
                 const av1 = await loadImg(g1.avatar, g1.name);
-                scrollBuffer(385);
-                drawSmallCard(tl, 50, 50 + TOP_GAP, g1, av1, isTap);
+                showVipBanner(g1, av1);
+                scrollBuffer(405);
+                drawSmallCard(tl, box.x, box.y, g1, av1, isTap, box.w, box.h);
               }
-            } else {
-              // Single centered card row (alternating after a 2-card row, or explicit Single test)
-              openRightSlot = false;
-              openLeftHandle = "";
-              lastRowWasPair = false;
-              lastCardX = 294;
-              showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
-              const av1 = await loadImg(g1.avatar, g1.name);
-              scrollBuffer(385);
-              drawSmallCard(tl, 294, 50 + TOP_GAP, g1, av1, isTap);
             }
           }
 
@@ -1961,6 +2209,7 @@
     openRightSlot = false;
     openLeftHandle = "";
     lastRowWasPair = false;
+    consecutivePairs = 0;
     lastCardX = 294;
     hideVipBanner();
     fillPaperBase(pCtx, 0, BUFFER_H);

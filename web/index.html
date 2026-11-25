@@ -1,96 +1,105 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TikTok LIVE Virtual Pencil Printer</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TikTok LIVE Virtual Pencil Printer</title>
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-<div id="stage">
+  <div id="stage">
 
-  <!-- Main 3D WebGL Pen Plotter Scene (Clean full-height scene matching real stream) -->
-  <main id="scene">
-    <canvas id="canvas3d"></canvas>
+    <!-- Main 3D WebGL Pen Plotter Scene (Clean full-height scene matching real stream) -->
+    <main id="scene">
+      <canvas id="canvas3d"></canvas>
 
-    <!-- Camera-look overlay for webcam photorealism -->
-    <div id="cameraOverlay"></div>
-  </main>
+      <!-- Camera-look overlay for webcam photorealism -->
+      <div id="cameraOverlay"></div>
+    </main>
 
-  <!-- Video Gameplay / Campfire Section (Bottom half in Split Mode) -->
-  <section id="robloxSection">
-    <video id="robloxVideo" preload="none" loop muted playsinline data-src="campfire.mp4"></video>
-    <div id="robloxPlaceholder" class="robloxPlaceholder">
-      <div class="robloxBadge">🔥 LIVE CAMPFIRE</div>
-      <div class="robloxDesc">Streaming cozy fireplace stream</div>
-      <button id="btnBrowseVideo" class="browseBtn">📁 Change Video</button>
+    <!-- Video Gameplay / Campfire Section (Bottom half in Split Mode) -->
+    <section id="robloxSection">
+      <video id="robloxVideo" preload="none" loop muted playsinline data-src="campfire.mp4"></video>
+      <div id="robloxPlaceholder" class="robloxPlaceholder">
+        <div class="robloxBadge">🔥 LIVE CAMPFIRE</div>
+        <div class="robloxDesc">Streaming cozy fireplace stream</div>
+        <button id="btnBrowseVideo" class="browseBtn">📁 Change Video</button>
+      </div>
+    </section>
+
+    <!-- Golden VIP Shoutout Banner (Appears on screen for VIP / Expensive Gifters) -->
+    <div id="vipBanner" class="hidden">
+      <img id="vipBannerAvatar" src="" alt="">
+      <div class="vipBannerBody">
+        <div id="vipBannerBadge" class="vipBannerBadge">👑 TOP 1 VIP GIFTER</div>
+        <div id="vipBannerFollow" class="vipBannerFollow">FOLLOW @username</div>
+        <div id="vipBannerGift" class="vipBannerGift">Sent Universe • 1,000 coins</div>
+      </div>
     </div>
-  </section>
 
   <!-- Golden VIP Shoutout Banner (Appears on screen for VIP / Expensive Gifters) -->
   <div id="vipBanner" class="hidden">
     <img id="vipBannerAvatar" src="" alt="">
     <div class="vipBannerBody">
-      <div id="vipBannerBadge" class="vipBannerBadge">👑 TOP 1 VIP GIFTER</div>
+      <div id="vipBannerBadge" class="vipBannerBadge">👑 TOP 1 VVIP GIFTER</div>
       <div id="vipBannerFollow" class="vipBannerFollow">FOLLOW @username</div>
-      <div id="vipBannerGift" class="vipBannerGift">Sent Universe • 1,000 coins</div>
     </div>
-  </div>
 
-  <!-- Live Action Pill (TikTok comment / status) -->
-  <div id="livePill">
-    <span id="pillText">kyla comment - added to the draw queue.</span>
-  </div>
+    <!-- Streamer Control Panel (Collapsible to keep stream view 100% clean) -->
+    <aside id="controls" class="collapsed">
+      <button id="btnToggleControls" class="toggleControlsBtn" title="Toggle Streamer Controls">⚙️ Controls</button>
+      <div class="ctrlContent">
+        <div class="ctrlRow">
+          <span id="dot" class="dot"></span>
+          <span id="statusText">Connecting to local server…</span>
+        </div>
+        <div class="ctrlRow">
+          <input id="user" placeholder="@tiktok_username" spellcheck="false" autocomplete="off">
+          <button id="btnConn">Start</button>
+        </div>
+        <div class="ctrlRow actions">
+          <button id="btnTestPair" title="Pair (2-column side-by-side)">Pair 🌹</button>
+          <button id="btnTestSingle" title="Single (centered card)">Single 1</button>
+          <button id="btnTestBig" title="VIP gift (Doughnut / 20-98 coins)" class="amberBtn">VIP 🍩</button>
+          <button id="btnVvip" title="VVIP gift (Galaxy / 99+ coins)" class="goldBtn">VVIP 👑</button>
+          <button id="btnTop1" title="VVIP TOP 1 with Royal Crown & Flaming Wings" class="goldBtn">👑 VVIP TOP
+            1</button>
+          <button id="btnTestTap" title="Simulate Screen Tapper (Likes)" class="roseBtn">Tap ❤️</button>
+          <button id="btnClear" title="Feed all paper">Clear</button>
+        </div>
+        <div class="ctrlRow">
+          <label class="toggleLabel"><input id="chkDrawTaps" type="checkbox" checked> Draw Tappers (Only when idle / no
+            gifts)</label>
+          <label class="toggleLabel"><input id="chkPencilSfx" type="checkbox" checked> Pencil Sound ✏️</label>
+        </div>
+        <div class="ctrlRow splitControls">
+          <label class="toggleLabel"><input id="chkSplit" type="checkbox"> Split Video</label>
+          <input id="videoInput" type="file" accept="video/*" style="display:none">
+          <input id="musicInput" type="file" accept="audio/*,video/*" style="display:none">
+          <button id="btnPickVideo" class="smBtn" title="Load custom Roblox / Campfire video">Video 📁</button>
+          <button id="btnPickMusic" class="smBtn" title="Load looping background music (MP3/WAV)">Music 🎵</button>
+          <button id="btnMuteVideo" class="smBtn" title="Toggle audio mute">🔇 Muted</button>
+        </div>
+        <div class="ctrlRow">
+          <label>Speed <input id="speed" type="range" min="0.5" max="3" step="0.1" value="1.5"></label>
+        </div>
+      </div>
+    </aside>
 
-  <!-- Streamer Control Panel (Collapsible to keep stream view 100% clean) -->
-  <aside id="controls" class="collapsed">
-    <button id="btnToggleControls" class="toggleControlsBtn" title="Toggle Streamer Controls">⚙️ Controls</button>
-    <div class="ctrlContent">
-      <div class="ctrlRow">
-        <span id="dot" class="dot"></span>
-        <span id="statusText">Connecting to local server…</span>
-      </div>
-      <div class="ctrlRow">
-        <input id="user" placeholder="@tiktok_username" spellcheck="false" autocomplete="off">
-        <button id="btnConn">Start</button>
-      </div>
-      <div class="ctrlRow actions">
-        <button id="btnTestPair" title="Pair (2-column side-by-side)">Pair 🌹</button>
-        <button id="btnTestSingle" title="Single (centered card)">Single 1</button>
-        <button id="btnTestBig" title="Big gift (Doughnut / 30 coins)" class="amberBtn">Big 🍩</button>
-        <button id="btnVvip" title="VIP banner" class="goldBtn">VIP 👑</button>
-        <button id="btnTop1" title="VIP TOP 1 with Royal Crown & Flaming Wings" class="goldBtn">👑 TOP 1</button>
-        <button id="btnTestTap" title="Simulate Screen Tapper (Likes)" class="roseBtn">Tap ❤️</button>
-        <button id="btnClear" title="Feed all paper">Clear</button>
-      </div>
-      <div class="ctrlRow">
-        <label class="toggleLabel"><input id="chkDrawTaps" type="checkbox" checked> Draw Tappers (Only when idle / no gifts)</label>
-      </div>
-      <div class="ctrlRow splitControls">
-        <label class="toggleLabel"><input id="chkSplit" type="checkbox"> Split Video</label>
-        <input id="videoInput" type="file" accept="video/*" style="display:none">
-        <input id="musicInput" type="file" accept="audio/*,video/*" style="display:none">
-        <button id="btnPickVideo" class="smBtn" title="Load custom Roblox / Campfire video">Video 📁</button>
-        <button id="btnPickMusic" class="smBtn" title="Load looping background music (MP3/WAV)">Music 🎵</button>
-        <button id="btnMuteVideo" class="smBtn" title="Toggle audio mute">🔇 Muted</button>
-      </div>
-      <div class="ctrlRow">
-        <label>Speed <input id="speed" type="range" min="0.5" max="3" step="0.1" value="1.5"></label>
-      </div>
+    <!-- Debug Reference Overlay for ?ref=N and ?ref=N&flip=1 -->
+    <div id="refOverlay" class="hidden">
+      <img id="refImg" src="" alt="Reference Ground Truth">
+      <div id="refLabel" class="refLabel"></div>
     </div>
-  </aside>
 
-  <!-- Debug Reference Overlay for ?ref=N and ?ref=N&flip=1 -->
-  <div id="refOverlay" class="hidden">
-    <img id="refImg" src="" alt="Reference Ground Truth">
-    <div id="refLabel" class="refLabel"></div>
   </div>
 
-</div>
-
-<script src="lib/three.min.js"></script>
-<script src="lib/gsap.min.js"></script>
-<script src="avatars_data.js"></script>
-<script src="app.js"></script>
+  <script src="lib/three.min.js"></script>
+  <script src="lib/gsap.min.js"></script>
+  <script src="avatars_data.js"></script>
+  <script src="app.js"></script>
 </body>
+
 </html>
