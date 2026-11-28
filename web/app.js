@@ -392,7 +392,7 @@
   bCtx.shadowColor = "rgba(0,0,0,0.85)";
   bCtx.shadowBlur = 4;
   bCtx.shadowOffsetY = 2;
-  bCtx.fillText("PRINT BOOTH", 420, 80);
+  bCtx.fillText("VIP PROFILE", 420, 80);
 
   // Vibrant coral-pink secondary title
   bCtx.font = "bold 32px sans-serif";
@@ -856,51 +856,115 @@
     });
   }
 
+  const giftImgCache = new Map();
+  function loadGiftImg(src) {
+    if (!src) return Promise.resolve(null);
+    if ((src.startsWith("http://") || src.startsWith("https://")) && !src.startsWith("/img")) {
+      src = "/img?u=" + encodeURIComponent(src);
+    }
+    if (giftImgCache.has(src)) return Promise.resolve(giftImgCache.get(src));
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      let done = false;
+      const finish = (res, cacheIt = false) => {
+        if (!done) {
+          done = true;
+          if (cacheIt) giftImgCache.set(src, res);
+          resolve(res);
+        }
+      };
+      const timer = setTimeout(() => finish(null, false), 1500);
+      img.onload = () => {
+        clearTimeout(timer);
+        finish(img.naturalWidth > 2 ? img : null, img.naturalWidth > 2);
+      };
+      img.onerror = () => { clearTimeout(timer); finish(null, false); };
+      img.src = src;
+      if (img.complete && img.naturalWidth > 2) { clearTimeout(timer); finish(img, true); }
+    });
+  }
+
+  function getGiftEmoji(giftName) {
+    const g = String(giftName || "").toLowerCase();
+    if (g.includes("rose")) return "🌹";
+    if (g.includes("doughnut") || g.includes("donut")) return "🍩";
+    if (g.includes("universe") || g.includes("galaxy") || g.includes("planet") || g.includes("nebula")) return "🌌";
+    if (g.includes("lion")) return "🦁";
+    if (g.includes("whale")) return "🐳";
+    if (g.includes("castle")) return "🏰";
+    if (g.includes("dragon")) return "🐉";
+    if (g.includes("crown") || g.includes("top")) return "👑";
+    if (g.includes("heart") || g.includes("love")) return "💖";
+    if (g.includes("ice cream")) return "🍦";
+    if (g.includes("perfume")) return "🧴";
+    if (g.includes("butterfly")) return "🦋";
+    if (g.includes("cap") || g.includes("hat")) return "🧢";
+    if (g.includes("sunglass")) return "🕶️";
+    if (g.includes("corgi")) return "🐶";
+    if (g.includes("money")) return "💵";
+    if (g.includes("firework")) return "🎆";
+    if (g.includes("car") || g.includes("speedway")) return "🏎️";
+    if (g.includes("jet") || g.includes("rocket")) return "🚀";
+    if (g.includes("tiktok")) return "🎵";
+    if (g.includes("gg")) return "🎮";
+    if (g.includes("tap")) return "❤️";
+    return "🎁";
+  }
+
+  function drawGiftAttachment(ctx, bx, by, badgeR, giftImg, giftName, count = 1, borderColor = "#1c1917") {
+    ctx.save();
+    // Crisp circular sticker badge pinned to the corner of the avatar picture
+    ctx.shadowColor = "rgba(0,0,0,0.28)";
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 2;
+    ctx.beginPath();
+    ctx.arc(bx, by, badgeR, 0, Math.PI * 2);
+    ctx.fillStyle = "#fffdf7";
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.lineWidth = 3.2;
+    ctx.strokeStyle = borderColor;
+    ctx.stroke();
+
+    if (giftImg) {
+      const pad = badgeR * 0.22;
+      const s = (badgeR - pad) * 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(bx, by, badgeR - 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(giftImg, bx - s / 2, by - s / 2, s, s);
+      ctx.restore();
+    } else {
+      ctx.font = `${Math.round(badgeR * 1.15)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(getGiftEmoji(giftName), bx, by + 2);
+    }
+
+    if (count > 1) {
+      const tagText = `x${count}`;
+      ctx.font = "900 14px sans-serif";
+      const tw = Math.max(24, ctx.measureText(tagText).width + 10);
+      ctx.fillStyle = "#dc2626";
+      ctx.beginPath();
+      ctx.roundRect(bx - tw / 2, by + badgeR - 10, tw, 18, 9);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(tagText, bx, by + badgeR - 1);
+    }
+    ctx.restore();
+  }
+
   // =========================================================================
   // 5. GSAP DRAWING & KINEMATICS ENGINE
   // =========================================================================
-  const vipBanner = $("vipBanner");
-  const vipBannerAvatar = $("vipBannerAvatar");
-  const vipBannerBadge = $("vipBannerBadge");
-  const vipBannerFollow = $("vipBannerFollow");
-  let vipBannerTimer = null;
-
-  function showVipBanner(g, resolvedImg) {
-    if (!vipBanner) return;
-    if (vipBannerTimer) clearTimeout(vipBannerTimer);
-    const cleanHandle = String(g.handle || g.name || "user").replace(/^@/, "").trim();
-    vipBanner.classList.toggle("tier-rose", !g.isVvip && !g.isBig);
-    if (vipBannerBadge) {
-      vipBannerBadge.textContent = g.isTap
-        ? `❤️ TAP HERO • ${g.taps || 50} TAPS`
-        : g.isVvip
-          ? `👑 ${g.rankText || "TOP 1"} VVIP GIFTER`
-          : g.isBig
-            ? `👑 VIP • ${g.rankText || "TOP"}`
-            : `🌹 GIFTER • ${g.rankText || "TOP"}`;
-    }
-    if (vipBannerFollow) {
-      vipBannerFollow.textContent = `FOLLOW @${cleanHandle}`;
-    }
-    if (vipBannerAvatar) {
-      if (resolvedImg && resolvedImg.src) {
-        vipBannerAvatar.src = resolvedImg.src;
-      } else if (resolvedImg && resolvedImg.toDataURL) {
-        vipBannerAvatar.src = resolvedImg.toDataURL();
-      } else if (g.avatar) {
-        vipBannerAvatar.src = g.avatar;
-      }
-    }
-    vipBanner.classList.remove("hidden");
-    vipBannerTimer = setTimeout(() => {
-      vipBanner.classList.add("hidden");
-    }, 9000);
-  }
-  function hideVipBanner() {
-    if (!vipBanner) return;
-    if (vipBannerTimer) clearTimeout(vipBannerTimer);
-    vipBanner.classList.add("hidden");
-  }
+  // Floating follower popup removed: FOLLOW @username prints directly on every card
+  function showVipBanner() {}
+  function hideVipBanner() {}
 
   function showPill(text) {
     if (!livePill) return;
@@ -1071,8 +1135,8 @@
     ctx.restore();
   }
 
-  // Draw Standard Card (matching Image 4 & Image 1 sequence) + FOLLOW @handle
-  function animateStandardCard(timeline, x, y, w, h, name, avatarImg, handle = "") {
+  // Draw Standard Card (matching Image 4 & Image 1 sequence) + FOLLOW @handle + Attached Gift Badge
+  function animateStandardCard(timeline, x, y, w, h, name, avatarImg, handle = "", giftMeta = null) {
     const cx = x + w / 2;
     const cy = y + h * 0.39;
     const r = Math.min(w, h) * 0.255;
@@ -1144,6 +1208,13 @@
         pCtx.arc(cx, cy, r, -Math.PI / 2, theta);
         pCtx.stroke();
         markPaperDirty();
+      },
+      onComplete: () => {
+        if (giftMeta) {
+          const badgeR = Math.max(22, Math.round(r * 0.30));
+          drawGiftAttachment(pCtx, cx + r * 0.72, cy + r * 0.72, badgeR, giftMeta.giftImg, giftMeta.giftName || "Rose", giftMeta.count || 1, "#1c1917");
+          markPaperDirty(true);
+        }
       }
     });
 
@@ -1220,10 +1291,11 @@
   }
 
   // Draw Tap Supporter Card (for viewers tapping screen during warmup)
-  function animateTapCard(timeline, x, y, w, h, name, avatarImg, taps) {
+  function animateTapCard(timeline, x, y, w, h, name, avatarImg, taps, handle = "") {
     const cx = x + w / 2;
-    const cy = y + h * 0.42;
-    const r = Math.min(w, h) * 0.27;
+    const cy = y + h * 0.39;
+    const r = Math.min(w, h) * 0.255;
+    const cleanHandle = String(handle || name || "user").replace(/^@/, "").trim();
 
     // Step 1: Draw top line with rose-red corner ticks & Heart Banner
     const topProgress = { t: 0 };
@@ -1294,12 +1366,17 @@
         pCtx.arc(cx, cy, r, -Math.PI / 2, theta);
         pCtx.stroke();
         markPaperDirty();
+      },
+      onComplete: () => {
+        const badgeR = Math.max(22, Math.round(r * 0.29));
+        drawGiftAttachment(pCtx, cx + r * 0.72, cy + r * 0.72, badgeR, null, "tap", 1, "#e11d48");
+        markPaperDirty(true);
       }
     });
 
-    // Step 3: Name & Heart Subtitle
+    // Step 3: Name, FOLLOW @handle & Tap count inside the card
     const nameProgress = { t: 0 };
-    const textStartX = x + 35, textEndX = x + w - 35, textY = y + h * 0.82;
+    const textStartX = x + 35, textEndX = x + w - 35, textY = y + h * 0.75;
     timeline.to(carriageGroup.position, { x: canvasXto3D(textStartX), duration: 0.18 / speed });
     timeline.to(gantryGroup.position, { z: canvasYto3D(textY), duration: 0.18 / speed }, "<");
 
@@ -1308,14 +1385,18 @@
       duration: 0.55 / speed,
       ease: "none",
       onStart: () => {
-        pCtx.font = "bold 24px sans-serif";
+        pCtx.font = "bold 23px sans-serif";
         pCtx.fillStyle = "#1c1917";
         pCtx.textAlign = "center";
-        pCtx.fillText("♡ " + name + " ♡", cx, textY);
+        pCtx.fillText("♡ " + name + " ♡", cx, textY, w - 32);
 
-        pCtx.font = "bold 16px sans-serif";
+        pCtx.font = "900 16px 'Arial Black', Impact, sans-serif";
+        pCtx.fillStyle = "#b91c1c";
+        pCtx.fillText(`★ FOLLOW @${cleanHandle} ★`, cx, textY + 30, w - 32);
+
+        pCtx.font = "bold 14px sans-serif";
         pCtx.fillStyle = "#e11d48";
-        pCtx.fillText("❤️ " + (taps || 20) + " TAPS", cx, textY + 28);
+        pCtx.fillText("❤️ " + (taps || 20) + " TAPS", cx, textY + 54, w - 32);
         markPaperDirty();
       },
       onUpdate: () => {
@@ -1368,8 +1449,8 @@
     });
   }
 
-  // Draw Big Card (matching Image 5: Dek_$LM@) with FOLLOW @handle shoutout inside the paper
-  function animateBigCard(timeline, y, name, avatarImg, handle = "", giftText = "", rankText = "") {
+  // Draw Big Card (matching Image 5: Dek_$LM@) with FOLLOW @handle & Gift Sticker attached
+  function animateBigCard(timeline, y, name, avatarImg, handle = "", giftText = "", rankText = "", giftMeta = null) {
     const w = 680, h = 450;
     const x = (BUFFER_W - w) / 2;
     const cx = BUFFER_W / 2;
@@ -1444,6 +1525,12 @@
         pCtx.arc(cx, cy, r, -Math.PI / 2, theta);
         pCtx.stroke();
         markPaperDirty();
+      },
+      onComplete: () => {
+        if (giftMeta) {
+          drawGiftAttachment(pCtx, cx + r * 0.74, cy + r * 0.74, 32, giftMeta.giftImg, giftMeta.giftName || "Doughnut", giftMeta.count || 1, "#d97706");
+          markPaperDirty(true);
+        }
       }
     });
 
@@ -1537,157 +1624,8 @@
     });
   }
 
-  // Draw Tap Supporter Card (for viewers tapping screen during warmup)
-  function animateTapCard(timeline, x, y, w, h, name, avatarImg, taps) {
-    const cx = x + w / 2;
-    const cy = y + h * 0.42;
-    const r = Math.min(w, h) * 0.27;
-
-    // Step 1: Draw top line with rose-red corner ticks & Heart Banner
-    const topProgress = { t: 0 };
-    timeline.to(carriageGroup.position, { x: canvasXto3D(x), duration: 0.22 / speed, ease: "power2.out" });
-    timeline.to(gantryGroup.position, { z: canvasYto3D(y + 14), duration: 0.22 / speed, ease: "power2.out" }, "<");
-
-    timeline.to(topProgress, {
-      t: 1,
-      duration: 0.35 / speed,
-      ease: "none",
-      onStart: () => {
-        ledMat.color.setHex(0xf43f5e);
-        penGlowLight.color.setHex(0xf43f5e);
-      },
-      onUpdate: () => {
-        const curX = x + w * topProgress.t;
-        setPenPosition(curX, y);
-
-        pCtx.strokeStyle = "#e11d48";
-        pCtx.lineWidth = 4;
-        pCtx.beginPath();
-        pCtx.moveTo(x, y + 14);
-        pCtx.lineTo(x, y);
-        pCtx.lineTo(curX, y);
-        pCtx.stroke();
-        markPaperDirty();
-      }
-    });
-
-    timeline.call(() => {
-      pCtx.beginPath();
-      pCtx.moveTo(x + w, y);
-      pCtx.lineTo(x + w, y + 14);
-      pCtx.stroke();
-
-      pCtx.font = "bold 18px sans-serif";
-      pCtx.fillStyle = "#e11d48";
-      pCtx.textAlign = "center";
-      pCtx.fillText("❤️ TAP HERO ❤️", cx, y - 8);
-      markPaperDirty();
-    });
-
-    // Step 2: Draw avatar circle with cute pink border
-    timeline.to(carriageGroup.position, { x: canvasXto3D(cx + r), duration: 0.22 / speed, ease: "power2.out" });
-    timeline.to(gantryGroup.position, { z: canvasYto3D(cy), duration: 0.22 / speed, ease: "power2.out" }, "<");
-
-    const circleProgress = { t: 0 };
-    timeline.to(circleProgress, {
-      t: 1,
-      duration: 0.75 / speed,
-      ease: "none",
-      onUpdate: () => {
-        const theta = 2 * Math.PI * circleProgress.t - Math.PI / 2;
-        const curX = cx + Math.cos(theta) * r;
-        const curY = cy + Math.sin(theta) * r;
-        setPenPosition(curX, curY);
-
-        pCtx.save();
-        pCtx.beginPath();
-        pCtx.arc(cx, cy, r, 0, 2 * Math.PI * circleProgress.t);
-        pCtx.clip();
-        if (avatarImg) pCtx.drawImage(avatarImg, cx - r, cy - r, r * 2, r * 2);
-        pCtx.restore();
-
-        pCtx.lineWidth = 4;
-        pCtx.strokeStyle = "#fb7185";
-        pCtx.beginPath();
-        pCtx.arc(cx, cy, r, -Math.PI / 2, theta);
-        pCtx.stroke();
-        markPaperDirty();
-      }
-    });
-
-    // Step 3: Name & Heart Subtitle
-    const nameProgress = { t: 0 };
-    const textStartX = x + 35, textEndX = x + w - 35, textY = y + h * 0.82;
-    timeline.to(carriageGroup.position, { x: canvasXto3D(textStartX), duration: 0.18 / speed });
-    timeline.to(gantryGroup.position, { z: canvasYto3D(textY), duration: 0.18 / speed }, "<");
-
-    timeline.to(nameProgress, {
-      t: 1,
-      duration: 0.55 / speed,
-      ease: "none",
-      onStart: () => {
-        pCtx.font = "bold 24px sans-serif";
-        pCtx.fillStyle = "#1c1917";
-        pCtx.textAlign = "center";
-        pCtx.fillText("♡ " + name + " ♡", cx, textY);
-
-        pCtx.font = "bold 16px sans-serif";
-        pCtx.fillStyle = "#e11d48";
-        pCtx.fillText("❤️ " + (taps || 20) + " TAPS", cx, textY + 28);
-        markPaperDirty();
-      },
-      onUpdate: () => {
-        const curX = textStartX + (textEndX - textStartX) * nameProgress.t;
-        const wiggle = Math.sin(nameProgress.t * Math.PI * 18) * 10;
-        setPenPosition(curX, textY + wiggle);
-      }
-    });
-
-    // Step 4: Enclose card frame
-    const encloseProgress = { t: 0 };
-    timeline.to(carriageGroup.position, { x: canvasXto3D(x + w), duration: 0.2 / speed });
-    timeline.to(gantryGroup.position, { z: canvasYto3D(y + 14), duration: 0.2 / speed }, "<");
-
-    timeline.to(encloseProgress, {
-      t: 1,
-      duration: 0.65 / speed,
-      ease: "none",
-      onUpdate: () => {
-        const t = encloseProgress.t;
-        let curX, curY;
-        pCtx.strokeStyle = "#1c1917";
-        pCtx.lineWidth = 4;
-        pCtx.beginPath();
-        pCtx.moveTo(x + w, y + 14);
-
-        if (t <= 0.4) {
-          const p = t / 0.4;
-          curX = x + w; curY = y + 14 + (h - 14) * p;
-          pCtx.lineTo(curX, curY);
-        } else if (t <= 0.8) {
-          const p = (t - 0.4) / 0.4;
-          pCtx.lineTo(x + w, y + h);
-          curX = x + w - w * p; curY = y + h;
-          pCtx.lineTo(curX, curY);
-        } else {
-          const p = (t - 0.8) / 0.2;
-          pCtx.lineTo(x + w, y + h);
-          pCtx.lineTo(x, y + h);
-          curX = x; curY = y + h - (h - 14) * p;
-          pCtx.lineTo(curX, curY);
-        }
-        setPenPosition(curX, curY);
-        pCtx.stroke();
-        markPaperDirty();
-      },
-      onComplete: () => {
-        markPaperDirty(true);
-      }
-    });
-  }
-
   // Draw VIP Full-Width Banner with Royal Crown & TOP 1 Rank (matching Image 1 & Image 3)
-  function animateVvipCard(timeline, y, name, avatarImg, rank = 1, rankText = "TOP 1", crownImg = null, handle = "") {
+  function animateVvipCard(timeline, y, name, avatarImg, rank = 1, rankText = "TOP 1", crownImg = null, handle = "", giftMeta = null) {
     // Proportioned matching Image 1: generous margins from paper edge, NOT edge-to-edge
     const w = 680, h = 510;
     const x = (BUFFER_W - w) / 2;
@@ -1783,6 +1721,9 @@
         pCtx.drawImage(crownImg, cx - 250 * scale, cy - 210 * scale, sw, sh);
       } else {
         drawVipCrownOrnament(pCtx, cx, cy, r, rankText);
+      }
+      if (giftMeta) {
+        drawGiftAttachment(pCtx, cx - r * 0.78, cy + r * 0.62, 30, giftMeta.giftImg, giftMeta.giftName || "Galaxy", giftMeta.count || 1, "#d97706");
       }
       markPaperDirty(true);
     });
@@ -1974,11 +1915,11 @@
     return { x, y, w, h };
   }
 
-  function drawSmallCard(tl, cardX, cardY, g, avImg, isTap, w = 435, h = 340) {
+  function drawSmallCard(tl, cardX, cardY, g, avImg, isTap, w = 435, h = 340, giftImg = null) {
     if (isTap) {
-      animateTapCard(tl, cardX, cardY, w, h, g.name, avImg, g.taps || 50);
+      animateTapCard(tl, cardX, cardY, w, h, g.name, avImg, g.taps || 50, g.handle || g.name);
     } else {
-      animateStandardCard(tl, cardX, cardY, w, h, g.name, avImg, g.handle || g.name);
+      animateStandardCard(tl, cardX, cardY, w, h, g.name, avImg, g.handle || g.name, { giftImg, giftName: g.gift || "Rose", count: g.count || 1 });
     }
   }
 
@@ -2091,13 +2032,13 @@
             consecutivePairs = 0;
             lastCardX = 294;
             showPill(`👑 VVIP ${g1.rankText || 'TOP 1'}: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
-            const [av1, crownImg] = await Promise.all([
+            const [av1, crownImg, giftImg1] = await Promise.all([
               loadImg(g1.avatar, g1.name),
-              loadImg("assets/vip_crown_top1.svg", "VVIP Crown")
+              loadImg("assets/vip_crown_top1.svg", "VVIP Crown"),
+              loadGiftImg(g1.icon)
             ]);
-            showVipBanner(g1, av1);
             scrollBuffer(565);
-            animateVvipCard(tl, 65 + TOP_GAP, g1.name, av1, g1.rank, g1.rankText || "TOP 1", crownImg, g1.handle || g1.name);
+            animateVvipCard(tl, 65 + TOP_GAP, g1.name, av1, g1.rank, g1.rankText || "TOP 1", crownImg, g1.handle || g1.name, { giftImg: giftImg1, giftName: g1.gift || "Galaxy", count: g1.count || 1 });
           } else if (g1.isBig) {
             openRightSlot = false;
             openLeftHandle = "";
@@ -2105,11 +2046,10 @@
             consecutivePairs = 0;
             lastCardX = 294;
             showPill(`👑 VIP: ${g1.name} — FOLLOW @${String(g1.handle || g1.name).replace(/^@/, '')}`);
-            const av1 = await loadImg(g1.avatar, g1.name);
-            showVipBanner(g1, av1);
+            const [av1, giftImg1] = await Promise.all([loadImg(g1.avatar, g1.name), loadGiftImg(g1.icon)]);
             // Scroll buffer down by 490px for Big Card (golden avatar ring + FOLLOW shoutout inside paper)
             scrollBuffer(490);
-            animateBigCard(tl, 55 + TOP_GAP, g1.name, av1, g1.handle || g1.name, "", g1.rankText || "TOP");
+            animateBigCard(tl, 55 + TOP_GAP, g1.name, av1, g1.handle || g1.name, "", g1.rankText || "TOP", { giftImg: giftImg1, giftName: g1.gift || "Doughnut", count: g1.count || 1 });
           } else {
             // Standard gifts & Tap Heroes: organic scrapbook flow (mixes varied solo positions & uneven pairs)
             // Never locks into two rigid columns down the paper!
@@ -2127,9 +2067,8 @@
               consecutivePairs++;
               lastCardX = xR;
               showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
-              const av1 = await loadImg(g1.avatar, g1.name);
-              showVipBanner(g1, av1);
-              drawSmallCard(tl, xR, yR, g1, av1, isTap, wR, hR);
+              const [av1, giftImg1] = await Promise.all([loadImg(g1.avatar, g1.name), isTap ? Promise.resolve(null) : loadGiftImg(g1.icon)]);
+              drawSmallCard(tl, xR, yR, g1, av1, isTap, wR, hR, giftImg1);
             } else {
               // Check if a different partner is waiting in queue for an optional pair row
               const partnerIdx = (!isTap && !g1.forceSingle)
@@ -2149,12 +2088,15 @@
                 consecutivePairs++;
                 lastCardX = 294;
                 showPill(`🌹 Print x2: ${g1.name} & ${g2.name}`);
-                const [av1, av2] = await Promise.all([loadImg(g1.avatar, g1.name), loadImg(g2.avatar, g2.name)]);
-                showVipBanner(g1, av1);
+                const [av1, av2, giftImg1, giftImg2] = await Promise.all([
+                  loadImg(g1.avatar, g1.name),
+                  loadImg(g2.avatar, g2.name),
+                  loadGiftImg(g1.icon),
+                  loadGiftImg(g2.icon)
+                ]);
                 scrollBuffer(405);
-                animateStandardCard(tl, x1, y1, w1, h1, g1.name, av1, g1.handle || g1.name);
-                tl.call(() => showVipBanner(g2, av2));
-                animateStandardCard(tl, x2, y2, w2, h2, g2.name, av2, g2.handle || g2.name);
+                animateStandardCard(tl, x1, y1, w1, h1, g1.name, av1, g1.handle || g1.name, { giftImg: giftImg1, giftName: g1.gift || "Rose", count: g1.count || 1 });
+                animateStandardCard(tl, x2, y2, w2, h2, g2.name, av2, g2.handle || g2.name, { giftImg: giftImg2, giftName: g2.gift || "Rose", count: g2.count || 1 });
               } else {
                 // Organic single card positioned across Left-ish / Center / Right-ish so nothing lines up in stiff tracks
                 const box = g1.forceSingle
@@ -2171,10 +2113,9 @@
                 lastCardX = box.x;
 
                 showPill(isTap ? `❤️ TAP HERO: ${g1.name} — ${g1.taps || 50} TAPS!` : `🌹 Print: ${g1.name}`);
-                const av1 = await loadImg(g1.avatar, g1.name);
-                showVipBanner(g1, av1);
+                const [av1, giftImg1] = await Promise.all([loadImg(g1.avatar, g1.name), isTap ? Promise.resolve(null) : loadGiftImg(g1.icon)]);
                 scrollBuffer(405);
-                drawSmallCard(tl, box.x, box.y, g1, av1, isTap, box.w, box.h);
+                drawSmallCard(tl, box.x, box.y, g1, av1, isTap, box.w, box.h, giftImg1);
               }
             }
           }
